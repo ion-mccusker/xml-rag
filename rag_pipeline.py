@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from xml_processor import XMLProcessor
 from json_processor import JSONProcessor
+from text_processor import TextProcessor
 from vector_store import VectorStore
 
 load_dotenv()
@@ -14,6 +15,7 @@ class RAGPipeline:
         self.vector_store = VectorStore(persist_directory)
         self.xml_processor = XMLProcessor()
         self.json_processor = JSONProcessor()
+        self.text_processor = TextProcessor()
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -33,8 +35,16 @@ class RAGPipeline:
         document_data = self.xml_processor.process_file(file_path)
         return self.vector_store.add_document(document_data)
 
+    def add_text_document(self, text_content: str, filename: str = None) -> str:
+        document_data = self.text_processor.extract_text_and_metadata(text_content, filename)
+        return self.vector_store.add_document(document_data)
+
     def add_json_file(self, file_path: str) -> str:
         document_data = self.json_processor.process_file(file_path)
+        return self.vector_store.add_document(document_data)
+
+    def add_text_file(self, file_path: str) -> str:
+        document_data = self.text_processor.process_file(file_path)
         return self.vector_store.add_document(document_data)
 
     def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None) -> List[Dict[str, Any]]:
@@ -47,7 +57,7 @@ class RAGPipeline:
             for result in context_results
         ])
 
-        system_prompt = """You are a helpful assistant that answers questions based on XML and JSON document content.
+        system_prompt = """You are a helpful assistant that answers questions based on document content (XML, JSON, and text files).
 Use only the provided context to answer questions. If the context doesn't contain enough information
 to answer the question, say so clearly. Always cite which source document your answer comes from."""
 

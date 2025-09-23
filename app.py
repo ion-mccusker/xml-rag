@@ -10,7 +10,7 @@ from rag_pipeline import RAGPipeline
 import tempfile
 import os
 
-app = FastAPI(title="Document RAG System", description="RAG system for XML and JSON documents")
+app = FastAPI(title="Document RAG System", description="RAG system for XML, JSON, and text documents")
 
 templates = Jinja2Templates(directory="templates")
 
@@ -36,8 +36,10 @@ async def home(request: Request):
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
-    if not (file.filename.endswith('.xml') or file.filename.endswith('.json')):
-        raise HTTPException(status_code=400, detail="Only XML and JSON files are allowed")
+    allowed_extensions = ['.xml', '.json', '.txt', '.md', '.py', '.js', '.html', '.css', '.log', '.csv']
+
+    if not any(file.filename.endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(status_code=400, detail=f"Only these file types are allowed: {', '.join(allowed_extensions)}")
 
     try:
         content = await file.read()
@@ -46,9 +48,12 @@ async def upload_document(file: UploadFile = File(...)):
         if file.filename.endswith('.xml'):
             document_id = rag.add_xml_document(text_content, file.filename)
             doc_type = "XML"
-        else:
+        elif file.filename.endswith('.json'):
             document_id = rag.add_json_document(text_content, file.filename)
             doc_type = "JSON"
+        else:
+            document_id = rag.add_text_document(text_content, file.filename)
+            doc_type = "TEXT"
 
         return {
             "message": f"{doc_type} document uploaded successfully",
@@ -58,7 +63,12 @@ async def upload_document(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        file_type = "XML" if file.filename.endswith('.xml') else "JSON"
+        if file.filename.endswith('.xml'):
+            file_type = "XML"
+        elif file.filename.endswith('.json'):
+            file_type = "JSON"
+        else:
+            file_type = "TEXT"
         raise HTTPException(status_code=500, detail=f"Error processing {file_type}: {str(e)}")
 
 @app.post("/query", response_model=QueryResponse)

@@ -21,7 +21,7 @@ class VectorStore:
         except:
             self.collection = self.client.create_collection(
                 name=self.collection_name,
-                metadata={"description": "XML and JSON documents with metadata"}
+                metadata={"description": "XML, JSON, and text documents with metadata"}
             )
 
     def add_document(self, document_data: Dict[str, Any]) -> str:
@@ -112,6 +112,16 @@ class VectorStore:
                         "data_type": metadata.get("data_type", ""),
                         "total_keys": metadata.get("total_keys", 0),
                         "structure_summary": metadata.get("structure_summary", "")
+                    }
+                elif doc_type == "text":
+                    documents[doc_id] = {
+                        "document_id": doc_id,
+                        "filename": metadata.get("filename", "unknown"),
+                        "document_type": doc_type,
+                        "total_words": metadata.get("total_words", 0),
+                        "total_lines": metadata.get("total_lines", 0),
+                        "title": metadata.get("title", ""),
+                        "language_hints": metadata.get("language_hints", [])
                     }
                 else:
                     documents[doc_id] = {

@@ -115,6 +115,10 @@
             background-color: #cce5ff;
             color: #004085;
         }
+        .doc-type-text {
+            background-color: #fff3cd;
+            color: #856404;
+        }
         .document-list {
             max-height: 200px;
             overflow-y: auto;
@@ -151,15 +155,15 @@
     <div class="container">
         <div class="header">
             <h1>Document RAG System</h1>
-            <p>Upload XML and JSON documents and ask questions about their content</p>
+            <p>Upload XML, JSON, and text documents and ask questions about their content</p>
             <p><strong>Documents in database: {{ document_count }}</strong></p>
         </div>
 
         <div class="section">
             <h3>Upload Document</h3>
             <div class="upload-area">
-                <p>Select an XML or JSON file to upload</p>
-                <input type="file" id="documentFile" accept=".xml,.json" />
+                <p>Select an XML, JSON, or text file to upload</p>
+                <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" />
                 <br>
                 <button onclick="uploadFile()">Upload Document</button>
             </div>
@@ -184,6 +188,9 @@
                         <strong>{{ doc.filename }}</strong> -
                         {% if doc.document_type == 'json' %}
                             {{ doc.data_type }} ({{ doc.total_keys }} keys)
+                        {% elif doc.document_type == 'text' %}
+                            {{ doc.total_words }} words, {{ doc.total_lines }} lines
+                            {% if doc.title %} - "{{ doc.title }}"{% endif %}
                         {% else %}
                             {{ doc.root_tag }} ({{ doc.element_count }} elements)
                         {% endif %}
@@ -324,9 +331,15 @@
                 if (result.documents && result.documents.length > 0) {
                     documentList.innerHTML = result.documents.map(doc => {
                         const docType = doc.document_type || 'xml';
-                        const details = doc.document_type === 'json'
-                            ? `${doc.data_type} (${doc.total_keys} keys)`
-                            : `${doc.root_tag} (${doc.element_count} elements)`;
+                        let details;
+                        if (doc.document_type === 'json') {
+                            details = `${doc.data_type} (${doc.total_keys} keys)`;
+                        } else if (doc.document_type === 'text') {
+                            details = `${doc.total_words} words, ${doc.total_lines} lines`;
+                            if (doc.title) details += ` - "${doc.title}"`;
+                        } else {
+                            details = `${doc.root_tag} (${doc.element_count} elements)`;
+                        }
                         return `<div class="document-item">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                             <strong>${doc.filename}</strong> - ${details}
