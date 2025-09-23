@@ -286,8 +286,11 @@
                 </select>
             </div>
             <input type="text" id="queryInput" class="query-input" placeholder="Ask a question about your documents..." />
-            <button onclick="queryDocuments()">Search & Ask</button>
-            <div class="loading" id="queryLoading">Searching and generating answer...</div>
+            <div style="margin-bottom: 10px;">
+                <button onclick="searchDocuments()" style="margin-right: 10px; background-color: #28a745;">Search Only</button>
+                <button onclick="queryDocuments()">Search & Ask</button>
+            </div>
+            <div class="loading" id="queryLoading">Processing...</div>
             <div id="queryResults"></div>
         </div>
 
@@ -338,8 +341,13 @@
                 <h3 id="chunkModalTitle">Chunk Content</h3>
                 <button class="close-modal" onclick="closeChunkModal()">Close</button>
             </div>
-            <div class="chunk-modal-body" id="chunkModalContent">
-                Loading...
+            <div class="chunk-modal-body">
+                <div id="chunkModalMetadata" class="chunk-metadata" style="margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-size: 12px;">
+                    Loading metadata...
+                </div>
+                <div id="chunkModalContent" style="font-family: monospace; font-size: 12px; background-color: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; overflow-y: auto; max-height: 400px;">
+                    Loading content...
+                </div>
             </div>
         </div>
     </div>
@@ -422,6 +430,46 @@
             }
         }
 
+        async function searchDocuments() {
+            const queryInput = document.getElementById('queryInput');
+            const resultsDiv = document.getElementById('queryResults');
+            const loadingDiv = document.getElementById('queryLoading');
+            const question = queryInput.value.trim();
+
+            if (!question) {
+                alert('Please enter a search query.');
+                return;
+            }
+
+            try {
+                loadingDiv.style.display = 'block';
+                resultsDiv.innerHTML = '';
+
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        question: question,
+                        max_results: 5
+                    })
+                });
+
+                const result = await response.json();
+                loadingDiv.style.display = 'none';
+
+                if (response.ok) {
+                    displaySearchResults(result);
+                } else {
+                    resultsDiv.innerHTML = `<div class="status error">Error: ${result.detail}</div>`;
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                resultsDiv.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+            }
+        }
+
         // Store chunks globally for modal access
         let currentChunks = [];
 
@@ -492,6 +540,64 @@
             window.currentSources = result.sources || [];
         }
 
+        function displaySearchResults(result) {
+            const resultsDiv = document.getElementById('queryResults');
+
+            let html = '<div class="results">';
+            html += `<h4>Search Results (${result.total_results} found):</h4>`;
+
+            if (result.results && result.results.length > 0) {
+                html += '<div class="retrieval-section">';
+                result.results.forEach((chunk, index) => {
+                    const docType = chunk.document_type || 'xml';
+                    html += `<div class="retrieved-chunk clickable-chunk" onclick="viewSearchChunk(${index})">
+                        <div style="margin-bottom: 8px;">
+                            <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                            <strong>Result ${index + 1}:</strong> ${chunk.filename} (chunk ${chunk.chunk_index})
+                            <span style="float: right; color: #666;">Relevance: ${chunk.relevance_score}</span>
+                        </div>
+                        <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
+                            <div class="chunk-content" style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;">
+                                ${chunk.content_preview}
+                            </div>
+                            <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #666;">
+                                Click to view full content
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += '</div>';
+            } else {
+                html += '<p>No relevant chunks found for your search query.</p>';
+            }
+
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+
+            // Store search results globally for modal access
+            window.currentSearchResults = result.results || [];
+        }
+
+        function viewSearchChunk(index) {
+            const modal = document.getElementById('chunkModal');
+            const modalTitle = document.getElementById('chunkModalTitle');
+            const modalContent = document.getElementById('chunkModalContent');
+            const modalMetadata = document.getElementById('chunkModalMetadata');
+
+            const chunk = window.currentSearchResults[index];
+            const docType = chunk.document_type || 'xml';
+
+            modalTitle.innerHTML = `
+                <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                Chunk ${chunk.chunk_index} from ${chunk.filename}
+            `;
+
+            // Format metadata for display
+            modalMetadata.innerHTML = formatMetadata(chunk.metadata || {}, docType, chunk);
+            modalContent.textContent = chunk.content;
+            modal.style.display = 'block';
+        }
+
         async function refreshDocuments() {
             try {
                 const response = await fetch('/documents');
@@ -527,6 +633,57 @@
         function showStatus(message, type) {
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function formatMetadata(metadata, docType, chunkData = null) {
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+
+            // Core chunk information
+            if (chunkData) {
+                html += `<div><strong>Document ID:</strong> ${chunkData.document_id || 'N/A'}</div>`;
+                html += `<div><strong>Relevance Score:</strong> ${chunkData.relevance_score || 'N/A'}</div>`;
+                html += `<div><strong>Distance:</strong> ${chunkData.distance ? chunkData.distance.toFixed(4) : 'N/A'}</div>`;
+            }
+
+            // Document type specific metadata
+            if (docType === 'xml') {
+                html += `<div><strong>Root Tag:</strong> ${metadata.root_tag || 'N/A'}</div>`;
+                html += `<div><strong>Element Count:</strong> ${metadata.element_count || 'N/A'}</div>`;
+                html += `<div><strong>Namespace:</strong> ${metadata.namespace || 'None'}</div>`;
+                html += `<div><strong>Depth:</strong> ${metadata.depth || 'N/A'}</div>`;
+                if (metadata.attributes && Object.keys(metadata.attributes).length > 0) {
+                    html += `<div><strong>Attributes:</strong> ${Object.keys(metadata.attributes).join(', ')}</div>`;
+                }
+            } else if (docType === 'json') {
+                html += `<div><strong>Data Type:</strong> ${metadata.data_type || 'N/A'}</div>`;
+                html += `<div><strong>Total Keys:</strong> ${metadata.total_keys || 'N/A'}</div>`;
+                html += `<div><strong>Max Depth:</strong> ${metadata.max_depth || 'N/A'}</div>`;
+                html += `<div><strong>Structure:</strong> ${metadata.structure_summary || 'N/A'}</div>`;
+            } else if (docType === 'text') {
+                html += `<div><strong>Total Words:</strong> ${metadata.total_words || 'N/A'}</div>`;
+                html += `<div><strong>Total Lines:</strong> ${metadata.total_lines || 'N/A'}</div>`;
+                html += `<div><strong>Paragraphs:</strong> ${metadata.paragraphs || 'N/A'}</div>`;
+                if (metadata.title) {
+                    html += `<div><strong>Title:</strong> ${metadata.title}</div>`;
+                }
+                if (metadata.language_hints) {
+                    html += `<div><strong>Content Hints:</strong> ${metadata.language_hints}</div>`;
+                }
+                if (metadata.potential_headers) {
+                    html += `<div><strong>Headers:</strong> ${metadata.potential_headers}</div>`;
+                }
+            }
+
+            // Common metadata
+            html += `<div><strong>Chunk Index:</strong> ${metadata.chunk_index || 'N/A'}</div>`;
+            html += `<div><strong>Chunk Length:</strong> ${metadata.chunk_length || 'N/A'} chars</div>`;
+
+            if (metadata.content_hash) {
+                html += `<div><strong>Content Hash:</strong> ${metadata.content_hash}</div>`;
+            }
+
+            html += '</div>';
+            return html;
         }
 
         function toggleChunk(index) {
@@ -574,8 +731,9 @@
             const modal = document.getElementById('chunkModal');
             const modalTitle = document.getElementById('chunkModalTitle');
             const modalContent = document.getElementById('chunkModalContent');
+            const modalMetadata = document.getElementById('chunkModalMetadata');
 
-            let chunk, content, filename, chunkIndex, docType;
+            let chunk, content, filename, chunkIndex, docType, metadata;
 
             if (type === 'retrieved') {
                 chunk = currentChunks[index];
@@ -583,31 +741,51 @@
                 filename = chunk.metadata.filename;
                 chunkIndex = chunk.metadata.chunk_index;
                 docType = chunk.metadata.document_type || 'xml';
+                metadata = chunk.metadata;
             } else if (type === 'source') {
                 chunk = window.currentSources[index];
                 content = chunk.full_content;
                 filename = chunk.filename;
                 chunkIndex = chunk.chunk_index;
                 docType = chunk.document_type || 'xml';
+                metadata = chunk.metadata || {};
             }
 
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                 Chunk ${chunkIndex} from ${filename}
             `;
+
+            // Format metadata for display
+            modalMetadata.innerHTML = formatMetadata(metadata, docType);
             modalContent.textContent = content;
             modal.style.display = 'block';
         }
 
-        function viewChunk(chunkContent, filename, chunkIndex, docType) {
+        function viewChunk(chunkContent, filename, chunkIndex, docType, metadata = {}) {
             const modal = document.getElementById('chunkModal');
             const modalTitle = document.getElementById('chunkModalTitle');
             const modalContent = document.getElementById('chunkModalContent');
+            const modalMetadata = document.getElementById('chunkModalMetadata');
 
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                 Chunk ${chunkIndex} from ${filename}
             `;
+
+            // Format metadata for display (minimal info if no metadata provided)
+            if (Object.keys(metadata).length === 0) {
+                modalMetadata.innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <div><strong>Chunk Index:</strong> ${chunkIndex}</div>
+                        <div><strong>Document Type:</strong> ${docType.toUpperCase()}</div>
+                        <div><strong>Content Length:</strong> ${chunkContent.length} chars</div>
+                    </div>
+                `;
+            } else {
+                modalMetadata.innerHTML = formatMetadata(metadata, docType);
+            }
+
             modalContent.textContent = chunkContent;
             modal.style.display = 'block';
         }
@@ -629,9 +807,27 @@
             }
         }
 
+        // Track last action for Enter key behavior
+        let lastAction = 'query'; // default to query
+
+        // Update button click handlers to track last action
+        const searchButton = document.querySelector('button[onclick="searchDocuments()"]');
+        const queryButton = document.querySelector('button[onclick="queryDocuments()"]');
+
+        if (searchButton) {
+            searchButton.addEventListener('click', () => lastAction = 'search');
+        }
+        if (queryButton) {
+            queryButton.addEventListener('click', () => lastAction = 'query');
+        }
+
         document.getElementById('queryInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                queryDocuments();
+                if (lastAction === 'search') {
+                    searchDocuments();
+                } else {
+                    queryDocuments();
+                }
             }
         });
     </script>

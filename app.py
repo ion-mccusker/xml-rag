@@ -10,6 +10,17 @@ from rag_pipeline import RAGPipeline
 from hf_rag_pipeline import HuggingFaceRAGPipeline
 import tempfile
 import os
+import logging
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    force=True
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Document RAG System", description="RAG system for XML, JSON, and text documents")
 
@@ -33,10 +44,19 @@ class QueryRequest(BaseModel):
     max_results: Optional[int] = 5
     pipeline: Optional[str] = "openai"  # "openai" or "huggingface"
 
+class SearchRequest(BaseModel):
+    question: str
+    max_results: Optional[int] = 5
+
 class QueryResponse(BaseModel):
     answer: str
     sources: List[dict]
     query: str
+
+class SearchResponse(BaseModel):
+    results: List[dict]
+    query: str
+    total_results: int
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -103,6 +123,40 @@ async def query_documents(query_request: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {str(e)}")
 
+@app.post("/search", response_model=SearchResponse)
+async def search_documents(search_request: SearchRequest):
+    try:
+        # Use current_rag for searching (both pipelines use same vector store)
+        search_results = current_rag.search_documents(
+            query=search_request.question,
+            n_results=search_request.max_results
+        )
+
+        # Format results for response
+        formatted_results = [
+            {
+                "filename": result["metadata"].get("filename", "unknown"),
+                "document_type": result["metadata"].get("document_type", "unknown"),
+                "chunk_index": result["metadata"].get("chunk_index", 0),
+                "distance": result["distance"],
+                "relevance_score": round(1 - result["distance"], 3),
+                "content": result["document"],
+                "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
+                "document_id": result["metadata"].get("document_id", ""),
+                "metadata": result["metadata"]
+            }
+            for result in search_results
+        ]
+
+        return SearchResponse(
+            results=formatted_results,
+            query=search_request.question,
+            total_results=len(formatted_results)
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing search: {str(e)}")
+
 @app.get("/documents")
 async def list_documents():
     return {
@@ -146,4 +200,11 @@ async def get_pipeline_info():
     }
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        # reload=reload,
+        log_level="info",
+        access_log=True
+    )
