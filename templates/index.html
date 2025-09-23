@@ -638,19 +638,27 @@
             }
 
             if (result.sources && result.sources.length > 0) {
-                html += '<h4>Source Summary:</h4>';
+                html += '<h4>Sources Used:</h4>';
+                html += '<div class="retrieval-section">';
                 result.sources.forEach((source, index) => {
                     const docType = source.document_type || 'xml';
-                    html += `<div class="source clickable-chunk" onclick="viewChunkByIndex(${index}, 'source')">
-                        <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                        <strong>Source ${index + 1}:</strong> ${source.filename} (chunk ${source.chunk_index})<br>
-                        <strong>Relevance score:</strong> ${source.relevance_score}<br>
-                        <strong>Preview:</strong> ${source.content_preview}
-                        <div style="text-align: center; margin-top: 8px; font-size: 10px; color: #666;">
-                            Click to view full chunk content
+                    html += `<div class="retrieved-chunk clickable-chunk" onclick="viewChunkByIndex(${index}, 'source')">
+                        <div style="margin-bottom: 8px;">
+                            <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                            <strong>Source ${index + 1}:</strong> ${source.filename} (chunk ${source.chunk_index})
+                            <span style="float: right; color: #666;">Relevance: ${source.relevance_score}</span>
+                        </div>
+                        <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
+                            <div class="chunk-content" style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;">
+                                ${source.content_preview}
+                            </div>
+                            <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #666;">
+                                Click to view full content
+                            </div>
                         </div>
                     </div>`;
                 });
+                html += '</div>';
             }
 
             html += '</div>';

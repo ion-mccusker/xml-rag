@@ -156,7 +156,10 @@ Answer:"""
                     "distance": result["distance"],
                     "relevance_score": round(1 - result["distance"], 3),
                     "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
-                    "full_content": result["document"]
+                    "full_content": result["document"],
+                    "content": result["document"],
+                    "document_id": result["metadata"].get("document_id", ""),
+                    "metadata": result["metadata"]
                 }
                 for result in search_results
             ],
