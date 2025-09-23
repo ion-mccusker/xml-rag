@@ -24,6 +24,7 @@ class TextProcessor:
         }
 
     def _extract_metadata(self, content: str, filename: str = None) -> Dict[str, Any]:
+        print("Extracting metadata")
         lines = content.split('\n')
         non_empty_lines = [line.strip() for line in lines if line.strip()]
 
@@ -40,7 +41,7 @@ class TextProcessor:
 
         language_hints = self._detect_language_hints(content)
         if language_hints:
-            metadata["language_hints"] = language_hints
+            metadata["language_hints"] = ", ".join(language_hints)
 
         structure_info = self._analyze_structure(content)
         metadata.update(structure_info)
@@ -201,7 +202,7 @@ class TextProcessor:
         numbered_count = len(re.findall(r'^\s*\d+\.\s+', content, re.MULTILINE))
 
         return {
-            "potential_headers": header_lines[:3],
+            "potential_headers": " | ".join(header_lines[:3]) if header_lines else "",
             "bullet_points": bullet_count,
             "numbered_items": numbered_count,
             "has_structure": bullet_count > 0 or numbered_count > 0 or len(header_lines) > 0

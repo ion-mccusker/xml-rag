@@ -1,9 +1,9 @@
+import uuid
+from typing import List, Dict, Any, Optional
+
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
-from typing import List, Dict, Any, Optional
-import uuid
-import json
 
 
 class VectorStore:
@@ -51,7 +51,6 @@ class VectorStore:
 
             chunk_metadatas.append(chunk_metadata)
             chunk_documents.append(chunk)
-
         chunk_embeddings = self.embedding_model.encode(chunk_documents).tolist()
 
         self.collection.add(
@@ -133,3 +132,31 @@ class VectorStore:
                     }
 
         return list(documents.values())
+
+    def get_document_content(self, document_id: str) -> Optional[Dict[str, Any]]:
+        chunks = self.collection.get(
+            where={"document_id": document_id},
+            include=["documents", "metadatas"]
+        )
+
+        if not chunks["documents"]:
+            return None
+
+        # Sort chunks by chunk_index to reconstruct original order
+        chunk_data = list(zip(chunks["documents"], chunks["metadatas"]))
+        chunk_data.sort(key=lambda x: x[1].get("chunk_index", 0))
+
+        sorted_chunks = [chunk[0] for chunk in chunk_data]
+        metadata = chunk_data[0][1] if chunk_data else {}
+
+        # Remove chunk-specific metadata
+        clean_metadata = {k: v for k, v in metadata.items()
+                         if k not in ["chunk_index", "chunk_length"]}
+
+        return {
+            "document_id": document_id,
+            "metadata": clean_metadata,
+            "chunks": sorted_chunks,
+            "full_content": "\n\n".join(sorted_chunks),
+            "total_chunks": len(sorted_chunks)
+        }

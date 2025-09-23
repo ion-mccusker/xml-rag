@@ -127,8 +127,110 @@
             border-radius: 5px;
         }
         .document-item {
-            padding: 5px;
+            padding: 8px;
             border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .document-item:hover {
+            background-color: #f8f9fa;
+        }
+        .document-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .document-modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 1000px;
+            height: 80%;
+            position: relative;
+            overflow: hidden;
+        }
+        .document-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .document-modal-body {
+            height: calc(100% - 80px);
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .close-modal {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .close-modal:hover {
+            background: #c82333;
+        }
+        .clickable-chunk {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .clickable-chunk:hover {
+            background-color: #e9ecef !important;
+        }
+        .chunk-modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .chunk-modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            height: 70%;
+            position: relative;
+            overflow: hidden;
+        }
+        .chunk-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .chunk-modal-body {
+            height: calc(100% - 80px);
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
         }
         .status {
             padding: 10px;
@@ -183,7 +285,7 @@
             <div class="document-list" id="documentList">
                 {% if documents %}
                     {% for doc in documents %}
-                    <div class="document-item">
+                    <div class="document-item" onclick="viewDocument('{{ doc.document_id }}', '{{ doc.filename }}')">
                         <span class="doc-type-badge doc-type-{{ doc.document_type or 'xml' }}">{{ (doc.document_type or 'xml')|upper }}</span>
                         <strong>{{ doc.filename }}</strong> -
                         {% if doc.document_type == 'json' %}
@@ -194,6 +296,7 @@
                         {% else %}
                             {{ doc.root_tag }} ({{ doc.element_count }} elements)
                         {% endif %}
+                        <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
                     </div>
                     {% endfor %}
                 {% else %}
@@ -201,6 +304,32 @@
                 {% endif %}
             </div>
             <button onclick="refreshDocuments()" style="margin-top: 10px;">Refresh List</button>
+        </div>
+    </div>
+
+    <!-- Document Modal -->
+    <div id="documentModal" class="document-modal">
+        <div class="document-modal-content">
+            <div class="document-modal-header">
+                <h3 id="modalTitle">Document Content</h3>
+                <button class="close-modal" onclick="closeDocumentModal()">Close</button>
+            </div>
+            <div class="document-modal-body" id="modalContent">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- Chunk Modal -->
+    <div id="chunkModal" class="chunk-modal">
+        <div class="chunk-modal-content">
+            <div class="chunk-modal-header">
+                <h3 id="chunkModalTitle">Chunk Content</h3>
+                <button class="close-modal" onclick="closeChunkModal()">Close</button>
+            </div>
+            <div class="chunk-modal-body" id="chunkModalContent">
+                Loading...
+            </div>
         </div>
     </div>
 
@@ -280,8 +409,14 @@
             }
         }
 
+        // Store chunks globally for modal access
+        let currentChunks = [];
+
         function displayQueryResults(result) {
             const resultsDiv = document.getElementById('queryResults');
+
+            // Store chunks for modal access
+            currentChunks = result.retrieved_chunks || [];
 
             let html = '<div class="results">';
             html += `<h4>Answer:</h4><p>${result.answer}</p>`;
@@ -291,14 +426,24 @@
                 html += '<h4>Retrieved Document Chunks (used to generate answer):</h4>';
                 result.retrieved_chunks.forEach((chunk, index) => {
                     const docType = chunk.metadata.document_type || 'xml';
-                    html += `<div class="retrieved-chunk">
+                    html += `<div class="retrieved-chunk clickable-chunk" onclick="viewChunkByIndex(${index}, 'retrieved')">
                         <div style="margin-bottom: 8px;">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                             <strong>Chunk ${index + 1}:</strong> ${chunk.metadata.filename} (chunk ${chunk.metadata.chunk_index})
                             <span style="float: right; color: #666;">Relevance: ${(1 - chunk.distance).toFixed(3)}</span>
                         </div>
                         <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
-                            ${chunk.document.length > 300 ? chunk.document.substring(0, 300) + '...' : chunk.document}
+                            <div class="chunk-content" style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;" id="chunk-${index}">
+                                ${chunk.document}
+                            </div>
+                            ${chunk.document.length > 500 ? `
+                                <button onclick="event.stopPropagation(); toggleChunk(${index})" style="margin-top: 5px; font-size: 10px; padding: 2px 6px;" id="toggle-${index}">
+                                    Show Full Content
+                                </button>
+                            ` : ''}
+                            <div style="text-align: center; margin-top: 5px; font-size: 10px; color: #666;">
+                                Click to view in full screen
+                            </div>
                         </div>
                     </div>`;
                 });
@@ -309,17 +454,23 @@
                 html += '<h4>Source Summary:</h4>';
                 result.sources.forEach((source, index) => {
                     const docType = source.document_type || 'xml';
-                    html += `<div class="source">
+                    html += `<div class="source clickable-chunk" onclick="viewChunkByIndex(${index}, 'source')">
                         <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                         <strong>Source ${index + 1}:</strong> ${source.filename} (chunk ${source.chunk_index})<br>
                         <strong>Relevance score:</strong> ${source.relevance_score}<br>
                         <strong>Preview:</strong> ${source.content_preview}
+                        <div style="text-align: center; margin-top: 8px; font-size: 10px; color: #666;">
+                            Click to view full chunk content
+                        </div>
                     </div>`;
                 });
             }
 
             html += '</div>';
             resultsDiv.innerHTML = html;
+
+            // Store sources globally
+            window.currentSources = result.sources || [];
         }
 
         async function refreshDocuments() {
@@ -340,9 +491,10 @@
                         } else {
                             details = `${doc.root_tag} (${doc.element_count} elements)`;
                         }
-                        return `<div class="document-item">
+                        return `<div class="document-item" onclick="viewDocument('${doc.document_id}', '${doc.filename}')">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                             <strong>${doc.filename}</strong> - ${details}
+                            <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
                         </div>`;
                     }).join('');
                 } else {
@@ -356,6 +508,106 @@
         function showStatus(message, type) {
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        function toggleChunk(index) {
+            const chunkDiv = document.getElementById(`chunk-${index}`);
+            const toggleBtn = document.getElementById(`toggle-${index}`);
+
+            if (chunkDiv.style.maxHeight === '150px' || !chunkDiv.style.maxHeight) {
+                chunkDiv.style.maxHeight = 'none';
+                toggleBtn.textContent = 'Collapse Content';
+            } else {
+                chunkDiv.style.maxHeight = '150px';
+                toggleBtn.textContent = 'Show Full Content';
+            }
+        }
+
+        async function viewDocument(documentId, filename) {
+            const modal = document.getElementById('documentModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = `Document: ${filename}`;
+            modalContent.textContent = 'Loading...';
+            modal.style.display = 'block';
+
+            try {
+                const response = await fetch(`/documents/${documentId}`);
+                const result = await response.json();
+
+                if (response.ok) {
+                    modalContent.textContent = result.full_content;
+                } else {
+                    modalContent.textContent = `Error: ${result.detail}`;
+                }
+            } catch (error) {
+                modalContent.textContent = `Error loading document: ${error.message}`;
+            }
+        }
+
+        function closeDocumentModal() {
+            const modal = document.getElementById('documentModal');
+            modal.style.display = 'none';
+        }
+
+        function viewChunkByIndex(index, type) {
+            const modal = document.getElementById('chunkModal');
+            const modalTitle = document.getElementById('chunkModalTitle');
+            const modalContent = document.getElementById('chunkModalContent');
+
+            let chunk, content, filename, chunkIndex, docType;
+
+            if (type === 'retrieved') {
+                chunk = currentChunks[index];
+                content = chunk.document;
+                filename = chunk.metadata.filename;
+                chunkIndex = chunk.metadata.chunk_index;
+                docType = chunk.metadata.document_type || 'xml';
+            } else if (type === 'source') {
+                chunk = window.currentSources[index];
+                content = chunk.full_content;
+                filename = chunk.filename;
+                chunkIndex = chunk.chunk_index;
+                docType = chunk.document_type || 'xml';
+            }
+
+            modalTitle.innerHTML = `
+                <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                Chunk ${chunkIndex} from ${filename}
+            `;
+            modalContent.textContent = content;
+            modal.style.display = 'block';
+        }
+
+        function viewChunk(chunkContent, filename, chunkIndex, docType) {
+            const modal = document.getElementById('chunkModal');
+            const modalTitle = document.getElementById('chunkModalTitle');
+            const modalContent = document.getElementById('chunkModalContent');
+
+            modalTitle.innerHTML = `
+                <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                Chunk ${chunkIndex} from ${filename}
+            `;
+            modalContent.textContent = chunkContent;
+            modal.style.display = 'block';
+        }
+
+        function closeChunkModal() {
+            const modal = document.getElementById('chunkModal');
+            modal.style.display = 'none';
+        }
+
+        // Close modals when clicking outside of them
+        window.onclick = function(event) {
+            const documentModal = document.getElementById('documentModal');
+            const chunkModal = document.getElementById('chunkModal');
+
+            if (event.target === documentModal) {
+                closeDocumentModal();
+            } else if (event.target === chunkModal) {
+                closeChunkModal();
+            }
         }
 
         document.getElementById('queryInput').addEventListener('keypress', function(e) {

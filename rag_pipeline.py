@@ -120,3 +120,6 @@ Please provide a comprehensive answer based on the context above."""
 
     def get_document_count(self) -> int:
         return self.vector_store.get_document_count()
+
+    def get_document_content(self, document_id: str):
+        return self.vector_store.get_document_content(document_id)
