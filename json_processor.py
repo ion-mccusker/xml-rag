@@ -14,6 +14,11 @@ class JSONProcessor:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON content: {str(e)}")
 
+        # Check if this matches the specific format: {"title": "...", "content": "...", "metadata": {...}}
+        if self._is_title_content_format(data):
+            return self._process_title_content_format(data, filename)
+
+        # Use original processing for other JSON formats
         metadata = self._extract_metadata(data, filename)
         text_chunks = self._extract_text_chunks(data)
 
@@ -155,3 +160,94 @@ class JSONProcessor:
             content = f.read()
 
         return self.extract_text_and_metadata(content, path.name)
+
+    def _is_title_content_format(self, data: Any) -> bool:
+        """Check if the JSON matches the specific format: {"title": "...", "content": "...", "metadata": {...}}"""
+        if not isinstance(data, dict):
+            return False
+
+        required_keys = {"title", "content"}
+        has_required = required_keys.issubset(data.keys())
+
+        # Check that title and content are strings
+        if has_required:
+            title_is_string = isinstance(data.get("title"), str)
+            content_is_string = isinstance(data.get("content"), str)
+            metadata_is_dict = isinstance(data.get("metadata", {}), dict)
+
+            return title_is_string and content_is_string and metadata_is_dict
+
+        return False
+
+    def _process_title_content_format(self, data: Dict[str, Any], filename: str = None) -> Dict[str, Any]:
+        """Process JSON documents with the specific title/content/metadata format"""
+        title = data.get("title", "").strip()
+        content = data.get("content", "").strip()
+        doc_metadata = data.get("metadata", {})
+
+        # Build metadata combining document info with nested metadata
+        metadata = {
+            "filename": filename or "unknown",
+            "document_type": "json",
+            "format_type": "title_content_metadata",
+            "title": title,
+            "content_length": len(content),
+            "has_nested_metadata": bool(doc_metadata)
+        }
+
+        # Add nested metadata fields (convert complex types to strings)
+        for key, value in doc_metadata.items():
+            if isinstance(value, (str, int, float, bool)) and value is not None:
+                metadata[f"meta_{key}"] = str(value)
+            elif isinstance(value, (list, dict)):
+                metadata[f"meta_{key}"] = str(value)
+
+        # Create text chunks from the content
+        text_chunks = []
+
+        # Add title as first chunk if present
+        if title:
+            text_chunks.append(f"Title: {title}")
+
+        # Process the main content
+        if content:
+            # Clean the content
+            clean_content = self._clean_text(content)
+            if clean_content:
+                # Split content into chunks if it's very long
+                if len(clean_content) > 1000:
+                    # Split into sentences and group them
+                    sentences = re.split(r'[.!?]+\s+', clean_content)
+                    current_chunk = ""
+
+                    for sentence in sentences:
+                        if len(current_chunk) + len(sentence) < 800:
+                            current_chunk += sentence + ". "
+                        else:
+                            if current_chunk.strip():
+                                text_chunks.append(f"Content: {current_chunk.strip()}")
+                            current_chunk = sentence + ". "
+
+                    # Add remaining content
+                    if current_chunk.strip():
+                        text_chunks.append(f"Content: {current_chunk.strip()}")
+                else:
+                    text_chunks.append(f"Content: {clean_content}")
+
+        # Add metadata as searchable content if it contains meaningful text
+        for key, value in doc_metadata.items():
+            if isinstance(value, str) and len(value.strip()) > 10:
+                clean_meta_text = self._clean_text(value.strip())
+                if clean_meta_text:
+                    text_chunks.append(f"{key}: {clean_meta_text}")
+
+        # Ensure we have at least some content
+        if not text_chunks:
+            text_chunks = [f"Document: {title}" if title else "Empty document"]
+
+        return {
+            "metadata": metadata,
+            "text_chunks": text_chunks,
+            "full_text": " ".join(text_chunks),
+            "document_type": "json"
+        }
