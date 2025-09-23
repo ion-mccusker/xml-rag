@@ -26,18 +26,41 @@ app = FastAPI(title="Document RAG System", description="RAG system for XML, JSON
 
 templates = Jinja2Templates(directory="templates")
 
-# Initialize both pipelines
-openai_rag = RAGPipeline()
+# Initialize pipelines with fallback logic
+openai_rag = None
+hf_rag = None
+openai_available = False
+hf_available = False
+current_rag = None
+
+# Try to initialize OpenAI pipeline first
+try:
+    openai_rag = RAGPipeline()
+    openai_available = True
+    current_rag = openai_rag
+    logger.info("OpenAI RAG pipeline initialized successfully")
+except Exception as e:
+    logger.error(f"OpenAI pipeline initialization failed: {e}")
+    print(f"OpenAI pipeline unavailable: {e}")
+
+# Try to initialize HuggingFace pipeline
 try:
     hf_rag = HuggingFaceRAGPipeline(model_name="microsoft/DialoGPT-medium")
     hf_available = True
+    # If OpenAI failed, use HuggingFace as default
+    if not openai_available:
+        current_rag = hf_rag
+        logger.info("Using HuggingFace pipeline as fallback")
+    logger.info("HuggingFace RAG pipeline initialized successfully")
 except Exception as e:
+    logger.error(f"HuggingFace pipeline initialization failed: {e}")
     print(f"HuggingFace pipeline unavailable: {e}")
-    hf_rag = None
-    hf_available = False
 
-# Default to OpenAI pipeline
-current_rag = openai_rag
+# Check if any pipeline is available
+pipelines_available = openai_available or hf_available
+if not pipelines_available:
+    logger.error("CRITICAL: No RAG pipelines available - search and query functionality will be disabled")
+    print("WARNING: No RAG pipelines available - search and query functionality will be disabled")
 
 class QueryRequest(BaseModel):
     question: str
@@ -60,16 +83,21 @@ class SearchResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    documents = current_rag.list_documents()
+    documents = current_rag.list_documents() if current_rag else []
     return templates.TemplateResponse("index.html", {
         "request": request,
         "documents": documents,
         "document_count": len(documents),
-        "hf_available": hf_available
+        "openai_available": openai_available,
+        "hf_available": hf_available,
+        "pipelines_available": pipelines_available
     })
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
+
     allowed_extensions = ['.xml', '.json', '.txt', '.md', '.py', '.js', '.html', '.css', '.log', '.csv']
 
     if not any(file.filename.endswith(ext) for ext in allowed_extensions):
@@ -107,6 +135,9 @@ async def upload_document(file: UploadFile = File(...)):
 
 @app.post("/upload-batch")
 async def upload_batch_documents(files: List[UploadFile] = File(...)):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
+
     allowed_extensions = ['.xml', '.json', '.txt', '.md', '.py', '.js', '.html', '.css', '.log', '.csv']
     results = []
     successful_uploads = 0
@@ -161,12 +192,21 @@ async def upload_batch_documents(files: List[UploadFile] = File(...)):
 
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(query_request: QueryRequest):
+    if not pipelines_available:
+        raise HTTPException(status_code=503, detail="No RAG pipelines available - query functionality disabled")
+
     try:
         # Select pipeline based on request
         if query_request.pipeline == "huggingface" and hf_available:
             selected_rag = hf_rag
-        else:
+        elif query_request.pipeline == "openai" and openai_available:
             selected_rag = openai_rag
+        else:
+            # Fallback to any available pipeline
+            selected_rag = current_rag
+
+        if not selected_rag:
+            raise HTTPException(status_code=503, detail="Requested pipeline not available")
 
         result = selected_rag.query(
             question=query_request.question,
@@ -179,6 +219,9 @@ async def query_documents(query_request: QueryRequest):
 
 @app.post("/search", response_model=SearchResponse)
 async def search_documents(search_request: SearchRequest):
+    if not pipelines_available:
+        raise HTTPException(status_code=503, detail="No RAG pipelines available - search functionality disabled")
+
     try:
         # Use current_rag for searching (both pipelines use same vector store)
         search_results = current_rag.search_documents(
@@ -213,6 +256,11 @@ async def search_documents(search_request: SearchRequest):
 
 @app.get("/documents")
 async def list_documents():
+    if not current_rag:
+        return {
+            "documents": [],
+            "total_count": 0
+        }
     return {
         "documents": current_rag.list_documents(),
         "total_count": current_rag.get_document_count()
@@ -220,6 +268,9 @@ async def list_documents():
 
 @app.get("/documents/{document_id}")
 async def get_document(document_id: str):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
     try:
         document = current_rag.get_document_content(document_id)
         if document is None:
@@ -232,6 +283,9 @@ async def get_document(document_id: str):
 
 @app.delete("/documents/{document_id}")
 async def delete_document(document_id: str):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
     try:
         current_rag.delete_document(document_id)
         return {"message": f"Document {document_id} deleted successfully"}
@@ -240,17 +294,24 @@ async def delete_document(document_id: str):
 
 @app.get("/pipelines/info")
 async def get_pipeline_info():
-    openai_info = {"name": "OpenAI", "type": "API", "available": True}
+    openai_info = {"name": "OpenAI", "type": "API", "available": openai_available}
     hf_info = {"name": "HuggingFace", "type": "Local", "available": hf_available}
-    if hf_available:
+    if hf_available and hf_rag:
         hf_info.update(hf_rag.get_model_info())
+
+    current_default = "none"
+    if openai_available:
+        current_default = "openai"
+    elif hf_available:
+        current_default = "huggingface"
 
     return {
         "pipelines": {
             "openai": openai_info,
             "huggingface": hf_info
         },
-        "current_default": "openai"
+        "current_default": current_default,
+        "pipelines_available": pipelines_available
     }
 
 if __name__ == "__main__":
