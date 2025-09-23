@@ -655,10 +655,60 @@
                     html += `<div><strong>Attributes:</strong> ${Object.keys(metadata.attributes).join(', ')}</div>`;
                 }
             } else if (docType === 'json') {
+                // Basic JSON metadata
                 html += `<div><strong>Data Type:</strong> ${metadata.data_type || 'N/A'}</div>`;
                 html += `<div><strong>Total Keys:</strong> ${metadata.total_keys || 'N/A'}</div>`;
+                html += `<div><strong>Total Items:</strong> ${metadata.total_items || 'N/A'}</div>`;
                 html += `<div><strong>Max Depth:</strong> ${metadata.max_depth || 'N/A'}</div>`;
                 html += `<div><strong>Structure:</strong> ${metadata.structure_summary || 'N/A'}</div>`;
+
+                // Title-content format specific metadata
+                if (metadata.format_type === 'title_content_metadata') {
+                    html += `<div><strong>Format Type:</strong> ${metadata.format_type}</div>`;
+                    if (metadata.title) {
+                        html += `<div><strong>Document Title:</strong> ${metadata.title}</div>`;
+                    }
+                    html += `<div><strong>Content Length:</strong> ${metadata.content_length || 'N/A'} chars</div>`;
+                    html += `<div><strong>Has Nested Metadata:</strong> ${metadata.has_nested_metadata ? 'Yes' : 'No'}</div>`;
+                }
+
+                // Display nested metadata fields (prefixed with meta_)
+                Object.keys(metadata).forEach(key => {
+                    if (key.startsWith('meta_')) {
+                        const displayKey = key.replace('meta_', '').replace(/_/g, ' ');
+                        const capitalizedKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
+                        html += `<div><strong>Meta ${capitalizedKey}:</strong> ${metadata[key]}</div>`;
+                    }
+                });
+
+                // Common metadata fields that might be present
+                if (metadata.title && metadata.format_type !== 'title_content_metadata') {
+                    html += `<div><strong>Title:</strong> ${metadata.title}</div>`;
+                }
+                if (metadata.name) {
+                    html += `<div><strong>Name:</strong> ${metadata.name}</div>`;
+                }
+                if (metadata.description) {
+                    html += `<div><strong>Description:</strong> ${metadata.description}</div>`;
+                }
+                if (metadata.author) {
+                    html += `<div><strong>Author:</strong> ${metadata.author}</div>`;
+                }
+                if (metadata.date) {
+                    html += `<div><strong>Date:</strong> ${metadata.date}</div>`;
+                }
+                if (metadata.created) {
+                    html += `<div><strong>Created:</strong> ${metadata.created}</div>`;
+                }
+                if (metadata.modified) {
+                    html += `<div><strong>Modified:</strong> ${metadata.modified}</div>`;
+                }
+                if (metadata.version) {
+                    html += `<div><strong>Version:</strong> ${metadata.version}</div>`;
+                }
+                if (metadata.id) {
+                    html += `<div><strong>ID:</strong> ${metadata.id}</div>`;
+                }
             } else if (docType === 'text') {
                 html += `<div><strong>Total Words:</strong> ${metadata.total_words || 'N/A'}</div>`;
                 html += `<div><strong>Total Lines:</strong> ${metadata.total_lines || 'N/A'}</div>`;
@@ -756,8 +806,8 @@
                 Chunk ${chunkIndex} from ${filename}
             `;
 
-            // Format metadata for display
-            modalMetadata.innerHTML = formatMetadata(metadata, docType);
+            // Format metadata for display with chunk data
+            modalMetadata.innerHTML = formatMetadata(metadata, docType, chunk);
             modalContent.textContent = content;
             modal.style.display = 'block';
         }

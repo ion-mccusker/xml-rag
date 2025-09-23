@@ -205,11 +205,7 @@ class JSONProcessor:
         # Create text chunks from the content
         text_chunks = []
 
-        # Add title as first chunk if present
-        if title:
-            text_chunks.append(f"Title: {title}")
-
-        # Process the main content
+        # Process the main content (don't include title in chunks)
         if content:
             # Clean the content
             clean_content = self._clean_text(content)
@@ -225,14 +221,14 @@ class JSONProcessor:
                             current_chunk += sentence + ". "
                         else:
                             if current_chunk.strip():
-                                text_chunks.append(f"Content: {current_chunk.strip()}")
+                                text_chunks.append(current_chunk.strip())
                             current_chunk = sentence + ". "
 
                     # Add remaining content
                     if current_chunk.strip():
-                        text_chunks.append(f"Content: {current_chunk.strip()}")
+                        text_chunks.append(current_chunk.strip())
                 else:
-                    text_chunks.append(f"Content: {clean_content}")
+                    text_chunks.append(clean_content)
 
         # Add metadata as searchable content if it contains meaningful text
         for key, value in doc_metadata.items():
@@ -243,7 +239,7 @@ class JSONProcessor:
 
         # Ensure we have at least some content
         if not text_chunks:
-            text_chunks = [f"Document: {title}" if title else "Empty document"]
+            text_chunks = [title if title else "Empty document"]
 
         return {
             "metadata": metadata,
