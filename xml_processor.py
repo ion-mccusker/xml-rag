@@ -21,12 +21,14 @@ class XMLProcessor:
         return {
             "metadata": metadata,
             "text_chunks": text_chunks,
-            "full_text": " ".join(text_chunks)
+            "full_text": " ".join(text_chunks),
+            "document_type": "xml"
         }
 
     def _extract_metadata(self, root: etree.Element, filename: str = None) -> Dict[str, Any]:
         metadata = {
             "filename": filename or "unknown",
+            "document_type": "xml",
             "root_tag": root.tag,
             "namespace": root.nsmap.get(None, ""),
             "attributes": dict(root.attrib),

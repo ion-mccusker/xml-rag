@@ -10,7 +10,7 @@ from rag_pipeline import RAGPipeline
 import tempfile
 import os
 
-app = FastAPI(title="XML RAG System", description="RAG system for XML documents")
+app = FastAPI(title="Document RAG System", description="RAG system for XML and JSON documents")
 
 templates = Jinja2Templates(directory="templates")
 
@@ -35,24 +35,31 @@ async def home(request: Request):
     })
 
 @app.post("/upload")
-async def upload_xml(file: UploadFile = File(...)):
-    if not file.filename.endswith('.xml'):
-        raise HTTPException(status_code=400, detail="Only XML files are allowed")
+async def upload_document(file: UploadFile = File(...)):
+    if not (file.filename.endswith('.xml') or file.filename.endswith('.json')):
+        raise HTTPException(status_code=400, detail="Only XML and JSON files are allowed")
 
     try:
         content = await file.read()
-        xml_content = content.decode('utf-8')
+        text_content = content.decode('utf-8')
 
-        document_id = rag.add_xml_document(xml_content, file.filename)
+        if file.filename.endswith('.xml'):
+            document_id = rag.add_xml_document(text_content, file.filename)
+            doc_type = "XML"
+        else:
+            document_id = rag.add_json_document(text_content, file.filename)
+            doc_type = "JSON"
 
         return {
-            "message": "XML document uploaded successfully",
+            "message": f"{doc_type} document uploaded successfully",
             "document_id": document_id,
-            "filename": file.filename
+            "filename": file.filename,
+            "document_type": doc_type.lower()
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing XML: {str(e)}")
+        file_type = "XML" if file.filename.endswith('.xml') else "JSON"
+        raise HTTPException(status_code=500, detail=f"Error processing {file_type}: {str(e)}")
 
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(query_request: QueryRequest):

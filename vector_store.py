@@ -14,14 +14,14 @@ class VectorStore:
         )
 
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.collection_name = "xml_documents"
+        self.collection_name = "documents"
 
         try:
             self.collection = self.client.get_collection(self.collection_name)
         except:
             self.collection = self.client.create_collection(
                 name=self.collection_name,
-                metadata={"description": "XML documents with metadata"}
+                metadata={"description": "XML and JSON documents with metadata"}
             )
 
     def add_document(self, document_data: Dict[str, Any]) -> str:
@@ -102,11 +102,24 @@ class VectorStore:
         for metadata in all_data["metadatas"]:
             doc_id = metadata.get("document_id")
             if doc_id and doc_id not in documents:
-                documents[doc_id] = {
-                    "document_id": doc_id,
-                    "filename": metadata.get("filename", "unknown"),
-                    "root_tag": metadata.get("root_tag", ""),
-                    "element_count": metadata.get("element_count", 0)
-                }
+                doc_type = metadata.get("document_type", "xml")
+
+                if doc_type == "json":
+                    documents[doc_id] = {
+                        "document_id": doc_id,
+                        "filename": metadata.get("filename", "unknown"),
+                        "document_type": doc_type,
+                        "data_type": metadata.get("data_type", ""),
+                        "total_keys": metadata.get("total_keys", 0),
+                        "structure_summary": metadata.get("structure_summary", "")
+                    }
+                else:
+                    documents[doc_id] = {
+                        "document_id": doc_id,
+                        "filename": metadata.get("filename", "unknown"),
+                        "document_type": doc_type,
+                        "root_tag": metadata.get("root_tag", ""),
+                        "element_count": metadata.get("element_count", 0)
+                    }
 
         return list(documents.values())

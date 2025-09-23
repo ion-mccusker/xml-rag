@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
 from xml_processor import XMLProcessor
+from json_processor import JSONProcessor
 from vector_store import VectorStore
 
 load_dotenv()
@@ -12,6 +13,7 @@ class RAGPipeline:
     def __init__(self, persist_directory: str = "./chroma_db"):
         self.vector_store = VectorStore(persist_directory)
         self.xml_processor = XMLProcessor()
+        self.json_processor = JSONProcessor()
 
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -23,8 +25,16 @@ class RAGPipeline:
         document_data = self.xml_processor.extract_text_and_metadata(xml_content, filename)
         return self.vector_store.add_document(document_data)
 
+    def add_json_document(self, json_content: str, filename: str = None) -> str:
+        document_data = self.json_processor.extract_text_and_metadata(json_content, filename)
+        return self.vector_store.add_document(document_data)
+
     def add_xml_file(self, file_path: str) -> str:
         document_data = self.xml_processor.process_file(file_path)
+        return self.vector_store.add_document(document_data)
+
+    def add_json_file(self, file_path: str) -> str:
+        document_data = self.json_processor.process_file(file_path)
         return self.vector_store.add_document(document_data)
 
     def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None) -> List[Dict[str, Any]]:
@@ -37,11 +47,11 @@ class RAGPipeline:
             for result in context_results
         ])
 
-        system_prompt = """You are a helpful assistant that answers questions based on XML document content.
+        system_prompt = """You are a helpful assistant that answers questions based on XML and JSON document content.
 Use only the provided context to answer questions. If the context doesn't contain enough information
 to answer the question, say so clearly. Always cite which source document your answer comes from."""
 
-        user_prompt = f"""Context from XML documents:
+        user_prompt = f"""Context from documents:
 {context_text}
 
 Question: {query}
@@ -79,13 +89,17 @@ Please provide a comprehensive answer based on the context above."""
             "sources": [
                 {
                     "filename": result["metadata"].get("filename", "unknown"),
+                    "document_type": result["metadata"].get("document_type", "unknown"),
                     "chunk_index": result["metadata"].get("chunk_index", 0),
                     "distance": result["distance"],
-                    "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"]
+                    "relevance_score": round(1 - result["distance"], 3),
+                    "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
+                    "full_content": result["document"]
                 }
                 for result in search_results
             ],
-            "query": question
+            "query": question,
+            "retrieved_chunks": search_results
         }
 
     def delete_document(self, document_id: str):
