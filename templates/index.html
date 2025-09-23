@@ -262,12 +262,12 @@
         </div>
 
         <div class="section">
-            <h3>Upload Document</h3>
+            <h3>Upload Documents</h3>
             <div class="upload-area">
-                <p>Select an XML, JSON, or text file to upload</p>
-                <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" />
+                <p>Select one or more XML, JSON, or text files to upload</p>
+                <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
                 <br>
-                <button onclick="uploadFile()">Upload Document</button>
+                <button onclick="uploadFiles()">Upload Documents</button>
             </div>
             <div id="uploadStatus"></div>
         </div>
@@ -353,39 +353,125 @@
     </div>
 
     <script>
-        async function uploadFile() {
+        async function uploadFiles() {
             const fileInput = document.getElementById('documentFile');
-            const file = fileInput.files[0];
+            const files = fileInput.files;
             const statusDiv = document.getElementById('uploadStatus');
 
-            if (!file) {
-                showStatus('Please select a file first.', 'error');
+            if (files.length === 0) {
+                showStatus('Please select at least one file first.', 'error');
                 return;
             }
 
-            const formData = new FormData();
-            formData.append('file', file);
+            let results = [];
+            let successCount = 0;
+            let errorCount = 0;
 
             try {
-                statusDiv.innerHTML = '<div class="status">Uploading...</div>';
+                statusDiv.innerHTML = `<div class="status">Uploading ${files.length} file(s)...</div>`;
 
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                if (files.length === 1) {
+                    // Single file upload using original endpoint
+                    const formData = new FormData();
+                    formData.append('file', files[0]);
 
-                const result = await response.json();
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                if (response.ok) {
-                    showStatus(`File uploaded successfully: ${result.filename}`, 'success');
-                    fileInput.value = '';
-                    refreshDocuments();
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        results.push({success: true, filename: result.filename, message: result.message});
+                        successCount = 1;
+                    } else {
+                        results.push({success: false, filename: files[0].name, error: result.detail});
+                        errorCount = 1;
+                    }
                 } else {
-                    showStatus(`Error: ${result.detail}`, 'error');
+                    // Multiple files upload using batch endpoint
+                    const formData = new FormData();
+                    for (let i = 0; i < files.length; i++) {
+                        formData.append('files', files[i]);
+                    }
+
+                    const response = await fetch('/upload-batch', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        results = result.results;
+                        successCount = result.successful_uploads;
+                        errorCount = result.failed_uploads;
+                    } else {
+                        // If batch endpoint fails, fall back to individual uploads
+                        statusDiv.innerHTML = `<div class="status">Batch upload failed, trying individual uploads...</div>`;
+
+                        for (let i = 0; i < files.length; i++) {
+                            const file = files[i];
+                            const formData = new FormData();
+                            formData.append('file', file);
+
+                            statusDiv.innerHTML = `<div class="status">Uploading file ${i + 1} of ${files.length}: ${file.name}...</div>`;
+
+                            try {
+                                const response = await fetch('/upload', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+
+                                const result = await response.json();
+
+                                if (response.ok) {
+                                    results.push({success: true, filename: result.filename, message: result.message});
+                                    successCount++;
+                                } else {
+                                    results.push({success: false, filename: file.name, error: result.detail});
+                                    errorCount++;
+                                }
+                            } catch (error) {
+                                results.push({success: false, filename: file.name, error: error.message});
+                                errorCount++;
+                            }
+                        }
+                    }
                 }
+
+                // Show final results
+                let statusHTML = '<div class="status-results">';
+                statusHTML += `<div class="status ${errorCount === 0 ? 'success' : 'error'}">`;
+                statusHTML += `Upload completed: ${successCount} successful, ${errorCount} failed</div>`;
+
+                if (results.length > 1) {
+                    statusHTML += '<div class="upload-details" style="margin-top: 10px; max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background-color: #f8f9fa;">';
+                    results.forEach(result => {
+                        if (result.success) {
+                            statusHTML += `<div style="color: #155724; margin: 2px 0;">✓ ${result.filename}: ${result.message}</div>`;
+                        } else {
+                            statusHTML += `<div style="color: #721c24; margin: 2px 0;">✗ ${result.filename}: ${result.error}</div>`;
+                        }
+                    });
+                    statusHTML += '</div>';
+                }
+
+                statusHTML += '</div>';
+                statusDiv.innerHTML = statusHTML;
+
+                fileInput.value = '';
+                refreshDocuments();
+
             } catch (error) {
-                showStatus(`Error uploading file: ${error.message}`, 'error');
+                showStatus(`Error during upload: ${error.message}`, 'error');
             }
+        }
+
+        // Keep the old function for backward compatibility
+        async function uploadFile() {
+            await uploadFiles();
         }
 
         async function queryDocuments() {

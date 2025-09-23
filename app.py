@@ -105,6 +105,60 @@ async def upload_document(file: UploadFile = File(...)):
             file_type = "TEXT"
         raise HTTPException(status_code=500, detail=f"Error processing {file_type}: {str(e)}")
 
+@app.post("/upload-batch")
+async def upload_batch_documents(files: List[UploadFile] = File(...)):
+    allowed_extensions = ['.xml', '.json', '.txt', '.md', '.py', '.js', '.html', '.css', '.log', '.csv']
+    results = []
+    successful_uploads = 0
+    failed_uploads = 0
+
+    for file in files:
+        result = {"filename": file.filename}
+
+        try:
+            # Validate file extension
+            if not any(file.filename.endswith(ext) for ext in allowed_extensions):
+                result["success"] = False
+                result["error"] = f"File type not allowed. Only these file types are supported: {', '.join(allowed_extensions)}"
+                failed_uploads += 1
+                results.append(result)
+                continue
+
+            # Read and process file
+            content = await file.read()
+            text_content = content.decode('utf-8')
+
+            if file.filename.endswith('.xml'):
+                document_id = current_rag.add_xml_document(text_content, file.filename)
+                doc_type = "XML"
+            elif file.filename.endswith('.json'):
+                document_id = current_rag.add_json_document(text_content, file.filename)
+                doc_type = "JSON"
+            else:
+                document_id = current_rag.add_text_document(text_content, file.filename)
+                doc_type = "TEXT"
+
+            result["success"] = True
+            result["document_id"] = document_id
+            result["document_type"] = doc_type.lower()
+            result["message"] = f"{doc_type} document uploaded successfully"
+            successful_uploads += 1
+
+        except Exception as e:
+            result["success"] = False
+            result["error"] = str(e)
+            failed_uploads += 1
+
+        results.append(result)
+
+    return {
+        "total_files": len(files),
+        "successful_uploads": successful_uploads,
+        "failed_uploads": failed_uploads,
+        "results": results,
+        "message": f"Batch upload completed: {successful_uploads} successful, {failed_uploads} failed"
+    }
+
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(query_request: QueryRequest):
     try:
