@@ -251,6 +251,166 @@
             display: none;
             color: #007bff;
         }
+        .progress-container {
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            margin: 15px 0;
+            overflow: hidden;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+            display: none;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 25px;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            border-radius: 10px;
+            text-align: center;
+            line-height: 25px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background-image: linear-gradient(
+                -45deg,
+                rgba(255, 255, 255, 0.2) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.2) 50%,
+                rgba(255, 255, 255, 0.2) 75%,
+                transparent 75%,
+                transparent
+            );
+            z-index: 1;
+            background-size: 50px 50px;
+            animation: move 2s linear infinite;
+        }
+        @keyframes move {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 50px 50px;
+            }
+        }
+        .progress-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+            text-align: center;
+        }
+        .file-progress {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+        .file-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .file-name {
+            font-weight: bold;
+            color: #333;
+            font-size: 13px;
+        }
+        .file-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            color: white;
+        }
+        .file-status.processing {
+            background-color: #007bff;
+        }
+        .file-status.success {
+            background-color: #28a745;
+        }
+        .file-status.error {
+            background-color: #dc3545;
+        }
+        .document-search {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .document-search input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .document-search select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .document-search button {
+            padding: 8px 15px;
+            font-size: 12px;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 15px;
+            gap: 5px;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background-color: white;
+            color: #333;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .pagination button:hover:not(:disabled) {
+            background-color: #007bff;
+            color: white;
+        }
+        .pagination button:disabled {
+            background-color: #f8f9fa;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+        .pagination button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .pagination-info {
+            margin: 0 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        .document-stats {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -269,7 +429,12 @@
                 <br>
                 <button onclick="uploadFiles()">Upload Documents</button>
             </div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            <div class="progress-text" id="progressText" style="display: none;"></div>
             <div id="uploadStatus"></div>
+            <div id="fileProgressContainer"></div>
         </div>
 
         <div class="section">
@@ -320,6 +485,21 @@
 
         <div class="section">
             <h3>Uploaded Documents</h3>
+            <div class="document-search">
+                <input type="text" id="documentSearchInput" placeholder="Search documents by filename, title, or content..." />
+                <select id="documentTypeFilter">
+                    <option value="">All Types</option>
+                    <option value="xml">XML</option>
+                    <option value="json">JSON</option>
+                    <option value="text">Text</option>
+                </select>
+                <button onclick="searchDocumentList()">Search</button>
+                <button onclick="clearDocumentSearch()">Clear</button>
+            </div>
+            <div class="document-stats" id="documentStats">
+                <span id="documentCount">Loading...</span>
+                <span id="documentRange"></span>
+            </div>
             <div class="document-list" id="documentList">
                 {% if documents %}
                     {% for doc in documents %}
@@ -341,6 +521,7 @@
                     <p>No documents uploaded yet.</p>
                 {% endif %}
             </div>
+            <div class="pagination" id="documentPagination"></div>
             <button onclick="refreshDocuments()" style="margin-top: 10px;">Refresh List</button>
         </div>
     </div>
@@ -381,21 +562,47 @@
             const fileInput = document.getElementById('documentFile');
             const files = fileInput.files;
             const statusDiv = document.getElementById('uploadStatus');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const fileProgressContainer = document.getElementById('fileProgressContainer');
 
             if (files.length === 0) {
                 showStatus('Please select at least one file first.', 'error');
                 return;
             }
 
+            // Reset and show progress elements
+            progressContainer.style.display = 'block';
+            progressText.style.display = 'block';
+            fileProgressContainer.innerHTML = '';
+            statusDiv.innerHTML = '';
+
             let results = [];
             let successCount = 0;
             let errorCount = 0;
+            const startTime = Date.now();
+
+            // Create individual file progress trackers
+            const fileTrackers = {};
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const trackerId = `file-${i}`;
+                fileTrackers[trackerId] = {
+                    element: createFileProgressElement(file.name, i),
+                    status: 'waiting'
+                };
+                fileProgressContainer.appendChild(fileTrackers[trackerId].element);
+            }
 
             try {
-                statusDiv.innerHTML = `<div class="status">Uploading ${files.length} file(s)...</div>`;
+                updateOverallProgress(0, files.length, 'Starting upload...', startTime);
 
                 if (files.length === 1) {
                     // Single file upload using original endpoint
+                    updateFileProgress(fileTrackers['file-0'], 'processing');
+                    updateOverallProgress(0, files.length, 'Uploading file...', startTime);
+
                     const formData = new FormData();
                     formData.append('file', files[0]);
 
@@ -409,59 +616,52 @@
                     if (response.ok) {
                         results.push({success: true, filename: result.filename, message: result.message});
                         successCount = 1;
+                        updateFileProgress(fileTrackers['file-0'], 'success');
                     } else {
                         results.push({success: false, filename: files[0].name, error: result.detail});
                         errorCount = 1;
+                        updateFileProgress(fileTrackers['file-0'], 'error');
                     }
+                    updateOverallProgress(1, files.length, 'Upload complete!', startTime);
                 } else {
-                    // Multiple files upload using batch endpoint
-                    const formData = new FormData();
+                    // Multiple files upload - process individually for better progress tracking
                     for (let i = 0; i < files.length; i++) {
-                        formData.append('files', files[i]);
-                    }
+                        const file = files[i];
+                        const trackerId = `file-${i}`;
 
-                    const response = await fetch('/upload-batch', {
-                        method: 'POST',
-                        body: formData
-                    });
+                        updateFileProgress(fileTrackers[trackerId], 'processing');
+                        updateOverallProgress(i, files.length, `Uploading ${file.name}...`, startTime);
 
-                    const result = await response.json();
+                        const formData = new FormData();
+                        formData.append('file', file);
 
-                    if (response.ok) {
-                        results = result.results;
-                        successCount = result.successful_uploads;
-                        errorCount = result.failed_uploads;
-                    } else {
-                        // If batch endpoint fails, fall back to individual uploads
-                        statusDiv.innerHTML = `<div class="status">Batch upload failed, trying individual uploads...</div>`;
+                        try {
+                            const response = await fetch('/upload', {
+                                method: 'POST',
+                                body: formData
+                            });
 
-                        for (let i = 0; i < files.length; i++) {
-                            const file = files[i];
-                            const formData = new FormData();
-                            formData.append('file', file);
+                            const result = await response.json();
 
-                            statusDiv.innerHTML = `<div class="status">Uploading file ${i + 1} of ${files.length}: ${file.name}...</div>`;
-
-                            try {
-                                const response = await fetch('/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                });
-
-                                const result = await response.json();
-
-                                if (response.ok) {
-                                    results.push({success: true, filename: result.filename, message: result.message});
-                                    successCount++;
-                                } else {
-                                    results.push({success: false, filename: file.name, error: result.detail});
-                                    errorCount++;
-                                }
-                            } catch (error) {
-                                results.push({success: false, filename: file.name, error: error.message});
+                            if (response.ok) {
+                                results.push({success: true, filename: result.filename, message: result.message});
+                                successCount++;
+                                updateFileProgress(fileTrackers[trackerId], 'success');
+                            } else {
+                                results.push({success: false, filename: file.name, error: result.detail});
                                 errorCount++;
+                                updateFileProgress(fileTrackers[trackerId], 'error');
                             }
+                        } catch (error) {
+                            results.push({success: false, filename: file.name, error: error.message});
+                            errorCount++;
+                            updateFileProgress(fileTrackers[trackerId], 'error');
                         }
+
+                        // Update progress after each file
+                        updateOverallProgress(i + 1, files.length,
+                            i + 1 === files.length ? 'Upload complete!' : `${i + 1} of ${files.length} files completed...`,
+                            startTime);
                     }
                 }
 
@@ -485,12 +685,89 @@
                 statusHTML += '</div>';
                 statusDiv.innerHTML = statusHTML;
 
+                // Hide progress elements after a delay
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressText.style.display = 'none';
+                }, 3000);
+
                 fileInput.value = '';
                 refreshDocuments();
 
             } catch (error) {
                 showStatus(`Error during upload: ${error.message}`, 'error');
+                progressContainer.style.display = 'none';
+                progressText.style.display = 'none';
             }
+        }
+
+        function createFileProgressElement(filename, index) {
+            const div = document.createElement('div');
+            div.className = 'file-progress';
+            div.innerHTML = `
+                <div class="file-progress-header">
+                    <span class="file-name">${filename}</span>
+                    <span class="file-status waiting" id="status-${index}">Waiting</span>
+                </div>
+                <div class="progress-container" style="display: block; margin: 5px 0;">
+                    <div class="progress-bar" id="file-progress-${index}" style="width: 0%;">0%</div>
+                </div>
+            `;
+            return div;
+        }
+
+        function updateFileProgress(tracker, status) {
+            const statusElement = tracker.element.querySelector('.file-status');
+            const progressBar = tracker.element.querySelector('.progress-bar');
+
+            statusElement.className = `file-status ${status}`;
+
+            switch(status) {
+                case 'processing':
+                    statusElement.textContent = 'Processing';
+                    progressBar.style.width = '50%';
+                    progressBar.textContent = '50%';
+                    break;
+                case 'success':
+                    statusElement.textContent = 'Success';
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    break;
+                case 'error':
+                    statusElement.textContent = 'Error';
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = 'Error';
+                    progressBar.style.background = 'linear-gradient(45deg, #dc3545, #c82333)';
+                    break;
+                default:
+                    statusElement.textContent = 'Waiting';
+                    progressBar.style.width = '0%';
+                    progressBar.textContent = '0%';
+            }
+        }
+
+        function updateOverallProgress(completed, total, message, startTime) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+
+            const percentage = Math.round((completed / total) * 100);
+            progressBar.style.width = percentage + '%';
+            progressBar.textContent = percentage + '%';
+
+            const elapsed = (Date.now() - startTime) / 1000;
+            const rate = completed > 0 ? (completed / elapsed).toFixed(1) : 0;
+            const eta = completed > 0 && completed < total ? Math.round((total - completed) / rate) : 0;
+
+            let statusText = message;
+            if (completed > 0) {
+                statusText += ` (${rate} files/sec`;
+                if (eta > 0) {
+                    statusText += `, ~${eta}s remaining`;
+                }
+                statusText += ')';
+            }
+
+            progressText.textContent = statusText;
         }
 
         // Keep the old function for backward compatibility
@@ -726,36 +1003,146 @@
             modal.style.display = 'block';
         }
 
-        async function refreshDocuments() {
+        // Document pagination and search state
+        let currentDocumentPage = 1;
+        const documentsPerPage = 10;
+        let currentSearchQuery = '';
+        let currentTypeFilter = '';
+
+        async function loadDocuments(page = 1, search = '', type = '') {
             try {
-                const response = await fetch('/documents');
+                const params = new URLSearchParams({
+                    page: page.toString(),
+                    per_page: documentsPerPage.toString()
+                });
+
+                if (search) params.append('search', search);
+                if (type) params.append('document_type', type);
+
+                const response = await fetch(`/documents?${params}`);
                 const result = await response.json();
 
-                const documentList = document.getElementById('documentList');
-                if (result.documents && result.documents.length > 0) {
-                    documentList.innerHTML = result.documents.map(doc => {
-                        const docType = doc.document_type || 'xml';
-                        let details;
-                        if (doc.document_type === 'json') {
-                            details = `${doc.data_type} (${doc.total_keys} keys)`;
-                        } else if (doc.document_type === 'text') {
-                            details = `${doc.total_words} words, ${doc.total_lines} lines`;
-                            if (doc.title) details += ` - "${doc.title}"`;
-                        } else {
-                            details = `${doc.root_tag} (${doc.element_count} elements)`;
-                        }
-                        return `<div class="document-item" onclick="viewDocument('${doc.document_id}', '${doc.filename}')">
-                            <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                            <strong>${doc.filename}</strong> - ${details}
-                            <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
-                        </div>`;
-                    }).join('');
-                } else {
-                    documentList.innerHTML = '<p>No documents uploaded yet.</p>';
-                }
+                updateDocumentsList(result);
+                updateDocumentsPagination(result);
+                updateDocumentsStats(result);
+
             } catch (error) {
-                console.error('Error refreshing documents:', error);
+                console.error('Error loading documents:', error);
+                document.getElementById('documentList').innerHTML = '<p>Error loading documents.</p>';
             }
+        }
+
+        function updateDocumentsList(result) {
+            const documentList = document.getElementById('documentList');
+
+            if (result.documents && result.documents.length > 0) {
+                documentList.innerHTML = result.documents.map(doc => {
+                    const docType = doc.document_type || 'xml';
+                    let details;
+                    if (doc.document_type === 'json') {
+                        details = `${doc.data_type} (${doc.total_keys} keys)`;
+                    } else if (doc.document_type === 'text') {
+                        details = `${doc.total_words} words, ${doc.total_lines} lines`;
+                        if (doc.title) details += ` - "${doc.title}"`;
+                    } else {
+                        details = `${doc.root_tag} (${doc.element_count} elements)`;
+                    }
+                    return `<div class="document-item" onclick="viewDocument('${doc.document_id}', '${doc.filename}')">
+                        <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
+                        <strong>${doc.filename}</strong> - ${details}
+                        <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
+                    </div>`;
+                }).join('');
+            } else {
+                const message = currentSearchQuery || currentTypeFilter
+                    ? 'No documents found matching your search criteria.'
+                    : 'No documents uploaded yet.';
+                documentList.innerHTML = `<p>${message}</p>`;
+            }
+        }
+
+        function updateDocumentsStats(result) {
+            const documentCount = document.getElementById('documentCount');
+            const documentRange = document.getElementById('documentRange');
+
+            if (result.total_count > 0) {
+                documentCount.textContent = `${result.total_count} document${result.total_count === 1 ? '' : 's'} total`;
+                documentRange.textContent = `Showing ${result.start_index}-${result.end_index}`;
+            } else {
+                documentCount.textContent = 'No documents';
+                documentRange.textContent = '';
+            }
+        }
+
+        function updateDocumentsPagination(result) {
+            const paginationDiv = document.getElementById('documentPagination');
+
+            if (result.total_pages <= 1) {
+                paginationDiv.innerHTML = '';
+                return;
+            }
+
+            let paginationHTML = '';
+
+            // Previous button
+            paginationHTML += `<button ${!result.has_prev ? 'disabled' : ''} onclick="goToDocumentPage(${result.page - 1})">Previous</button>`;
+
+            // Page numbers
+            const startPage = Math.max(1, result.page - 2);
+            const endPage = Math.min(result.total_pages, result.page + 2);
+
+            if (startPage > 1) {
+                paginationHTML += `<button onclick="goToDocumentPage(1)">1</button>`;
+                if (startPage > 2) {
+                    paginationHTML += `<span class="pagination-info">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                paginationHTML += `<button class="${i === result.page ? 'active' : ''}" onclick="goToDocumentPage(${i})">${i}</button>`;
+            }
+
+            if (endPage < result.total_pages) {
+                if (endPage < result.total_pages - 1) {
+                    paginationHTML += `<span class="pagination-info">...</span>`;
+                }
+                paginationHTML += `<button onclick="goToDocumentPage(${result.total_pages})">${result.total_pages}</button>`;
+            }
+
+            // Next button
+            paginationHTML += `<button ${!result.has_next ? 'disabled' : ''} onclick="goToDocumentPage(${result.page + 1})">Next</button>`;
+
+            paginationDiv.innerHTML = paginationHTML;
+        }
+
+        function goToDocumentPage(page) {
+            currentDocumentPage = page;
+            loadDocuments(page, currentSearchQuery, currentTypeFilter);
+        }
+
+        function searchDocumentList() {
+            const searchInput = document.getElementById('documentSearchInput');
+            const typeFilter = document.getElementById('documentTypeFilter');
+
+            currentSearchQuery = searchInput.value.trim();
+            currentTypeFilter = typeFilter.value;
+            currentDocumentPage = 1;
+
+            loadDocuments(1, currentSearchQuery, currentTypeFilter);
+        }
+
+        function clearDocumentSearch() {
+            document.getElementById('documentSearchInput').value = '';
+            document.getElementById('documentTypeFilter').value = '';
+            currentSearchQuery = '';
+            currentTypeFilter = '';
+            currentDocumentPage = 1;
+
+            loadDocuments(1, '', '');
+        }
+
+        async function refreshDocuments() {
+            await loadDocuments(currentDocumentPage, currentSearchQuery, currentTypeFilter);
         }
 
         function showStatus(message, type) {
@@ -1007,6 +1394,18 @@
                     queryDocuments();
                 }
             }
+        });
+
+        // Add keyboard support for document search
+        document.getElementById('documentSearchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchDocumentList();
+            }
+        });
+
+        // Initialize document loading when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDocuments(1, '', '');
         });
     </script>
 </body>
