@@ -230,12 +230,7 @@ class JSONProcessor:
                 else:
                     text_chunks.append(clean_content)
 
-        # Add metadata as searchable content if it contains meaningful text
-        for key, value in doc_metadata.items():
-            if isinstance(value, str) and len(value.strip()) > 10:
-                clean_meta_text = self._clean_text(value.strip())
-                if clean_meta_text:
-                    text_chunks.append(f"{key}: {clean_meta_text}")
+        # Don't add metadata to text chunks - metadata should only be stored as metadata
 
         # Ensure we have at least some content
         if not text_chunks:
