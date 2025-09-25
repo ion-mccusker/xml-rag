@@ -411,6 +411,84 @@
             justify-content: space-between;
             align-items: center;
         }
+        .metadata-section {
+            margin-bottom: 15px;
+        }
+        .metadata-header {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+        }
+        .metadata-header:hover {
+            background-color: #dee2e6;
+        }
+        .metadata-header h4 {
+            margin: 0;
+            flex: 1;
+            color: #495057;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .metadata-toggle {
+            font-size: 12px;
+            color: #6c757d;
+            transition: transform 0.2s;
+        }
+        .metadata-toggle.expanded {
+            transform: rotate(90deg);
+        }
+        .metadata-content {
+            display: none;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+        }
+        .metadata-content.expanded {
+            display: block;
+        }
+        .metadata-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .metadata-item {
+            padding: 8px 12px;
+            background-color: white;
+            border-radius: 3px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .metadata-item strong {
+            color: #495057;
+            font-size: 12px;
+            font-weight: bold;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 120px;
+        }
+        .metadata-value {
+            color: #6c757d;
+            font-size: 12px;
+            font-family: monospace;
+            word-break: break-word;
+            flex: 1;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+        .metadata-summary {
+            color: #6c757d;
+            font-size: 12px;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -547,10 +625,20 @@
                 <button class="close-modal" onclick="closeChunkModal()">Close</button>
             </div>
             <div class="chunk-modal-body">
-                <div id="chunkModalMetadata" class="chunk-metadata" style="margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-size: 12px;">
-                    Loading metadata...
+                <div class="metadata-section">
+                    <div class="metadata-header" onclick="toggleMetadata('chunkModal')">
+                        <h4>Metadata</h4>
+                        <span class="metadata-summary" id="chunkMetadataSummary">Click to view</span>
+                        <span class="metadata-toggle" id="chunkMetadataToggle">▶</span>
+                    </div>
+                    <div class="metadata-content" id="chunkModalMetadata">
+                        Loading metadata...
+                    </div>
                 </div>
-                <div id="chunkModalContent" style="font-family: monospace; font-size: 12px; background-color: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; overflow-y: auto; max-height: 400px;">
+                <div style="margin-bottom: 10px;">
+                    <strong style="color: #495057; font-size: 14px;">Content:</strong>
+                </div>
+                <div id="chunkModalContent" style="font-family: monospace; font-size: 12px; background-color: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; overflow-y: auto; max-height: 400px; border: 1px solid #dee2e6;">
                     Loading content...
                 </div>
             </div>
@@ -999,6 +1087,11 @@
 
             // Format metadata for display
             modalMetadata.innerHTML = formatMetadata(chunk.metadata || {}, docType, chunk);
+
+            // Update metadata summary
+            const summary = document.getElementById('chunkMetadataSummary');
+            summary.textContent = generateMetadataSummary(chunk.metadata || {}, docType);
+
             modalContent.textContent = chunk.content;
             modal.style.display = 'block';
         }
@@ -1151,40 +1244,40 @@
         }
 
         function formatMetadata(metadata, docType, chunkData = null) {
-            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+            let html = '<div class="metadata-grid">';
 
             // Core chunk information
             if (chunkData) {
-                html += `<div><strong>Document ID:</strong> ${chunkData.document_id || 'N/A'}</div>`;
-                html += `<div><strong>Relevance Score:</strong> ${chunkData.relevance_score || 'N/A'}</div>`;
-                html += `<div><strong>Distance:</strong> ${chunkData.distance ? chunkData.distance.toFixed(4) : 'N/A'}</div>`;
+                html += createMetadataItem('Document ID', chunkData.document_id || 'N/A');
+                html += createMetadataItem('Relevance Score', chunkData.relevance_score || 'N/A');
+                html += createMetadataItem('Distance', chunkData.distance ? chunkData.distance.toFixed(4) : 'N/A');
             }
 
             // Document type specific metadata
             if (docType === 'xml') {
-                html += `<div><strong>Root Tag:</strong> ${metadata.root_tag || 'N/A'}</div>`;
-                html += `<div><strong>Element Count:</strong> ${metadata.element_count || 'N/A'}</div>`;
-                html += `<div><strong>Namespace:</strong> ${metadata.namespace || 'None'}</div>`;
-                html += `<div><strong>Depth:</strong> ${metadata.depth || 'N/A'}</div>`;
+                html += createMetadataItem('Root Tag', metadata.root_tag || 'N/A');
+                html += createMetadataItem('Element Count', metadata.element_count || 'N/A');
+                html += createMetadataItem('Namespace', metadata.namespace || 'None');
+                html += createMetadataItem('Depth', metadata.depth || 'N/A');
                 if (metadata.attributes && Object.keys(metadata.attributes).length > 0) {
-                    html += `<div><strong>Attributes:</strong> ${Object.keys(metadata.attributes).join(', ')}</div>`;
+                    html += createMetadataItem('Attributes', Object.keys(metadata.attributes).join(', '));
                 }
             } else if (docType === 'json') {
                 // Basic JSON metadata
-                html += `<div><strong>Data Type:</strong> ${metadata.data_type || 'N/A'}</div>`;
-                html += `<div><strong>Total Keys:</strong> ${metadata.total_keys || 'N/A'}</div>`;
-                html += `<div><strong>Total Items:</strong> ${metadata.total_items || 'N/A'}</div>`;
-                html += `<div><strong>Max Depth:</strong> ${metadata.max_depth || 'N/A'}</div>`;
-                html += `<div><strong>Structure:</strong> ${metadata.structure_summary || 'N/A'}</div>`;
+                html += createMetadataItem('Data Type', metadata.data_type || 'N/A');
+                html += createMetadataItem('Total Keys', metadata.total_keys || 'N/A');
+                html += createMetadataItem('Total Items', metadata.total_items || 'N/A');
+                html += createMetadataItem('Max Depth', metadata.max_depth || 'N/A');
+                html += createMetadataItem('Structure', metadata.structure_summary || 'N/A');
 
                 // Title-content format specific metadata
                 if (metadata.format_type === 'title_content_metadata') {
-                    html += `<div><strong>Format Type:</strong> ${metadata.format_type}</div>`;
+                    html += createMetadataItem('Format Type', metadata.format_type);
                     if (metadata.title) {
-                        html += `<div><strong>Document Title:</strong> ${metadata.title}</div>`;
+                        html += createMetadataItem('Document Title', metadata.title);
                     }
-                    html += `<div><strong>Content Length:</strong> ${metadata.content_length || 'N/A'} chars</div>`;
-                    html += `<div><strong>Has Nested Metadata:</strong> ${metadata.has_nested_metadata ? 'Yes' : 'No'}</div>`;
+                    html += createMetadataItem('Content Length', (metadata.content_length || 'N/A') + ' chars');
+                    html += createMetadataItem('Has Nested Metadata', metadata.has_nested_metadata ? 'Yes' : 'No');
                 }
 
                 // Display nested metadata fields (prefixed with meta_)
@@ -1192,63 +1285,140 @@
                     if (key.startsWith('meta_')) {
                         const displayKey = key.replace('meta_', '').replace(/_/g, ' ');
                         const capitalizedKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
-                        html += `<div><strong>Meta ${capitalizedKey}:</strong> ${metadata[key]}</div>`;
+                        html += createMetadataItem(`Meta ${capitalizedKey}`, metadata[key]);
                     }
                 });
 
                 // Common metadata fields that might be present
                 if (metadata.title && metadata.format_type !== 'title_content_metadata') {
-                    html += `<div><strong>Title:</strong> ${metadata.title}</div>`;
+                    html += createMetadataItem('Title', metadata.title);
                 }
                 if (metadata.name) {
-                    html += `<div><strong>Name:</strong> ${metadata.name}</div>`;
+                    html += createMetadataItem('Name', metadata.name);
                 }
                 if (metadata.description) {
-                    html += `<div><strong>Description:</strong> ${metadata.description}</div>`;
+                    html += createMetadataItem('Description', metadata.description);
                 }
                 if (metadata.author) {
-                    html += `<div><strong>Author:</strong> ${metadata.author}</div>`;
+                    html += createMetadataItem('Author', metadata.author);
                 }
                 if (metadata.date) {
-                    html += `<div><strong>Date:</strong> ${metadata.date}</div>`;
+                    html += createMetadataItem('Date', metadata.date);
                 }
                 if (metadata.created) {
-                    html += `<div><strong>Created:</strong> ${metadata.created}</div>`;
+                    html += createMetadataItem('Created', metadata.created);
                 }
                 if (metadata.modified) {
-                    html += `<div><strong>Modified:</strong> ${metadata.modified}</div>`;
+                    html += createMetadataItem('Modified', metadata.modified);
                 }
                 if (metadata.version) {
-                    html += `<div><strong>Version:</strong> ${metadata.version}</div>`;
+                    html += createMetadataItem('Version', metadata.version);
                 }
                 if (metadata.id) {
-                    html += `<div><strong>ID:</strong> ${metadata.id}</div>`;
+                    html += createMetadataItem('ID', metadata.id);
                 }
             } else if (docType === 'text') {
-                html += `<div><strong>Total Words:</strong> ${metadata.total_words || 'N/A'}</div>`;
-                html += `<div><strong>Total Lines:</strong> ${metadata.total_lines || 'N/A'}</div>`;
-                html += `<div><strong>Paragraphs:</strong> ${metadata.paragraphs || 'N/A'}</div>`;
+                html += createMetadataItem('Total Words', metadata.total_words || 'N/A');
+                html += createMetadataItem('Total Lines', metadata.total_lines || 'N/A');
+                html += createMetadataItem('Paragraphs', metadata.paragraphs || 'N/A');
                 if (metadata.title) {
-                    html += `<div><strong>Title:</strong> ${metadata.title}</div>`;
+                    html += createMetadataItem('Title', metadata.title);
                 }
                 if (metadata.language_hints) {
-                    html += `<div><strong>Content Hints:</strong> ${metadata.language_hints}</div>`;
+                    html += createMetadataItem('Content Hints', metadata.language_hints);
                 }
                 if (metadata.potential_headers) {
-                    html += `<div><strong>Headers:</strong> ${metadata.potential_headers}</div>`;
+                    html += createMetadataItem('Headers', metadata.potential_headers);
                 }
             }
 
             // Common metadata
-            html += `<div><strong>Chunk Index:</strong> ${metadata.chunk_index || 'N/A'}</div>`;
-            html += `<div><strong>Chunk Length:</strong> ${metadata.chunk_length || 'N/A'} chars</div>`;
+            html += createMetadataItem('Chunk Index', metadata.chunk_index || 'N/A');
+            html += createMetadataItem('Chunk Length', (metadata.chunk_length || 'N/A') + ' chars');
 
             if (metadata.content_hash) {
-                html += `<div><strong>Content Hash:</strong> ${metadata.content_hash}</div>`;
+                html += createMetadataItem('Content Hash', metadata.content_hash);
             }
 
             html += '</div>';
             return html;
+        }
+
+        function createMetadataItem(label, value) {
+            const truncatedValue = truncateValue(value);
+            const isLong = value && value.toString().length > 100;
+
+            return `
+                <div class="metadata-item">
+                    <strong>${label}:</strong>
+                    <div class="metadata-value" ${isLong ? `title="${escapeHtml(value)}"` : ''}>
+                        ${truncatedValue}
+                    </div>
+                </div>
+            `;
+        }
+
+        function truncateValue(value) {
+            if (!value) return 'N/A';
+            const str = value.toString();
+            if (str.length <= 100) return escapeHtml(str);
+            return escapeHtml(str.substring(0, 97) + '...');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function generateMetadataSummary(metadata, docType) {
+            const parts = [];
+
+            if (docType === 'json' && metadata.format_type === 'title_content_metadata') {
+                if (metadata.title) parts.push(`Title: "${metadata.title}"`);
+                if (metadata.content_length) parts.push(`${metadata.content_length} chars`);
+            } else if (docType === 'json') {
+                if (metadata.total_keys) parts.push(`${metadata.total_keys} keys`);
+                if (metadata.data_type) parts.push(metadata.data_type);
+            } else if (docType === 'xml') {
+                if (metadata.root_tag) parts.push(`Root: ${metadata.root_tag}`);
+                if (metadata.element_count) parts.push(`${metadata.element_count} elements`);
+            } else if (docType === 'text') {
+                if (metadata.total_words) parts.push(`${metadata.total_words} words`);
+                if (metadata.total_lines) parts.push(`${metadata.total_lines} lines`);
+            }
+
+            if (metadata.chunk_index !== undefined) parts.push(`Chunk ${metadata.chunk_index}`);
+
+            return parts.length > 0 ? parts.join(', ') : 'Click to view';
+        }
+
+        function toggleMetadata(modalType) {
+            const toggle = document.getElementById(`${modalType.replace('Modal', '')}MetadataToggle`);
+            const content = document.getElementById(`${modalType}Metadata`);
+            const summary = document.getElementById(`${modalType.replace('Modal', '')}MetadataSummary`);
+
+            const isExpanded = content.classList.contains('expanded');
+
+            if (isExpanded) {
+                content.classList.remove('expanded');
+                toggle.classList.remove('expanded');
+                toggle.textContent = '▶';
+                // Restore original summary text (stored as data attribute)
+                const originalSummary = summary.getAttribute('data-original-summary');
+                if (originalSummary) {
+                    summary.textContent = originalSummary;
+                }
+            } else {
+                // Store original summary before changing it
+                if (!summary.getAttribute('data-original-summary')) {
+                    summary.setAttribute('data-original-summary', summary.textContent);
+                }
+                content.classList.add('expanded');
+                toggle.classList.add('expanded');
+                toggle.textContent = '▼';
+                summary.textContent = 'Click to hide';
+            }
         }
 
         function toggleChunk(index) {
@@ -1323,6 +1493,11 @@
 
             // Format metadata for display with chunk data
             modalMetadata.innerHTML = formatMetadata(metadata, docType, chunk);
+
+            // Update metadata summary
+            const summary = document.getElementById('chunkMetadataSummary');
+            summary.textContent = generateMetadataSummary(metadata, docType);
+
             modalContent.textContent = content;
             modal.style.display = 'block';
         }
@@ -1340,15 +1515,22 @@
 
             // Format metadata for display (minimal info if no metadata provided)
             if (Object.keys(metadata).length === 0) {
-                modalMetadata.innerHTML = `
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
-                        <div><strong>Chunk Index:</strong> ${chunkIndex}</div>
-                        <div><strong>Document Type:</strong> ${docType.toUpperCase()}</div>
-                        <div><strong>Content Length:</strong> ${chunkContent.length} chars</div>
-                    </div>
-                `;
+                const minimalMetadata = {
+                    chunk_index: chunkIndex,
+                    document_type: docType,
+                    chunk_length: chunkContent.length
+                };
+                modalMetadata.innerHTML = formatMetadata(minimalMetadata, docType);
+
+                // Update metadata summary
+                const summary = document.getElementById('chunkMetadataSummary');
+                summary.textContent = `${docType.toUpperCase()}, Chunk ${chunkIndex}, ${chunkContent.length} chars`;
             } else {
                 modalMetadata.innerHTML = formatMetadata(metadata, docType);
+
+                // Update metadata summary
+                const summary = document.getElementById('chunkMetadataSummary');
+                summary.textContent = generateMetadataSummary(metadata, docType);
             }
 
             modalContent.textContent = chunkContent;
