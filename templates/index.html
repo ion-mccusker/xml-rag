@@ -501,6 +501,19 @@
 
         <div class="section">
             <h3>Upload Documents</h3>
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="collectionSelect" style="font-weight: bold; color: #333;">Collection:</label>
+                    <select id="collectionSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 150px;">
+                        <option value="documents">documents (default)</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="text" id="newCollectionName" placeholder="New collection name" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <button onclick="createNewCollection()" style="padding: 8px 12px; font-size: 12px; background-color: #17a2b8; border: none; color: white; border-radius: 5px; cursor: pointer;">Create New</button>
+                </div>
+                <button onclick="refreshCollections()" style="padding: 8px 12px; font-size: 12px; background-color: #6c757d; border: none; color: white; border-radius: 5px; cursor: pointer;">Refresh</button>
+            </div>
             <div class="upload-area">
                 <p>Select one or more XML, JSON, or text files to upload</p>
                 <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
@@ -518,19 +531,27 @@
         <div class="section">
             <h3>Query Documents</h3>
             {% if pipelines_available %}
-            <div style="margin-bottom: 15px;">
-                <label for="pipelineSelect" style="display: block; margin-bottom: 5px; font-weight: bold;">AI Model:</label>
-                <select id="pipelineSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                    {% if openai_available %}
-                    <option value="openai">OpenAI GPT-3.5-turbo (Cloud)</option>
-                    {% endif %}
-                    {% if hf_available %}
-                    <option value="huggingface">HuggingFace Local Model</option>
-                    {% endif %}
-                    {% if not openai_available and not hf_available %}
-                    <option value="none" disabled>No pipelines available</option>
-                    {% endif %}
-                </select>
+            <div style="margin-bottom: 15px; display: flex; gap: 15px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column;">
+                    <label for="pipelineSelect" style="margin-bottom: 5px; font-weight: bold;">AI Model:</label>
+                    <select id="pipelineSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        {% if openai_available %}
+                        <option value="openai">OpenAI GPT-3.5-turbo (Cloud)</option>
+                        {% endif %}
+                        {% if hf_available %}
+                        <option value="huggingface">HuggingFace Local Model</option>
+                        {% endif %}
+                        {% if not openai_available and not hf_available %}
+                        <option value="none" disabled>No pipelines available</option>
+                        {% endif %}
+                    </select>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="queryCollectionSelect" style="margin-bottom: 5px; font-weight: bold;">Search Collection:</label>
+                    <select id="queryCollectionSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 150px;">
+                        <option value="documents">documents (default)</option>
+                    </select>
+                </div>
             </div>
             <input type="text" id="queryInput" class="query-input" placeholder="Ask a question about your documents..." />
             <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
@@ -582,6 +603,9 @@
                     <option value="xml">XML</option>
                     <option value="json">JSON</option>
                     <option value="text">Text</option>
+                </select>
+                <select id="documentCollectionFilter">
+                    <option value="">All Collections</option>
                 </select>
                 <button onclick="searchDocumentList()">Search</button>
                 <button onclick="clearDocumentSearch()">Clear</button>
@@ -706,6 +730,11 @@
                     const formData = new FormData();
                     formData.append('file', files[0]);
 
+                    const collectionSelect = document.getElementById('collectionSelect');
+                    if (collectionSelect && collectionSelect.value) {
+                        formData.append('collection_name', collectionSelect.value);
+                    }
+
                     const response = await fetch('/upload', {
                         method: 'POST',
                         body: formData
@@ -734,6 +763,11 @@
 
                         const formData = new FormData();
                         formData.append('file', file);
+
+                        const collectionSelect = document.getElementById('collectionSelect');
+                        if (collectionSelect && collectionSelect.value) {
+                            formData.append('collection_name', collectionSelect.value);
+                        }
 
                         try {
                             const response = await fetch('/upload', {
@@ -910,7 +944,8 @@
                     body: JSON.stringify({
                         question: question,
                         max_results: 5,
-                        pipeline: pipelineSelect.value
+                        pipeline: pipelineSelect.value,
+                        collection_name: document.getElementById('queryCollectionSelect').value
                     })
                 });
 
@@ -961,7 +996,8 @@
                     },
                     body: JSON.stringify({
                         question: question,
-                        max_results: 5
+                        max_results: 5,
+                        collection_name: document.getElementById('queryCollectionSelect').value
                     })
                 });
 
@@ -1125,8 +1161,9 @@
         const documentsPerPage = 10;
         let currentSearchQuery = '';
         let currentTypeFilter = '';
+        let currentCollectionFilter = '';
 
-        async function loadDocuments(page = 1, search = '', type = '') {
+        async function loadDocuments(page = 1, search = '', type = '', collection = '') {
             try {
                 const params = new URLSearchParams({
                     page: page.toString(),
@@ -1135,6 +1172,7 @@
 
                 if (search) params.append('search', search);
                 if (type) params.append('document_type', type);
+                if (collection) params.append('collection_name', collection);
 
                 const response = await fetch(`/documents?${params}`);
                 const result = await response.json();
@@ -1234,32 +1272,36 @@
 
         function goToDocumentPage(page) {
             currentDocumentPage = page;
-            loadDocuments(page, currentSearchQuery, currentTypeFilter);
+            loadDocuments(page, currentSearchQuery, currentTypeFilter, currentCollectionFilter);
         }
 
         function searchDocumentList() {
             const searchInput = document.getElementById('documentSearchInput');
             const typeFilter = document.getElementById('documentTypeFilter');
+            const collectionFilter = document.getElementById('documentCollectionFilter');
 
             currentSearchQuery = searchInput.value.trim();
             currentTypeFilter = typeFilter.value;
+            currentCollectionFilter = collectionFilter.value;
             currentDocumentPage = 1;
 
-            loadDocuments(1, currentSearchQuery, currentTypeFilter);
+            loadDocuments(1, currentSearchQuery, currentTypeFilter, currentCollectionFilter);
         }
 
         function clearDocumentSearch() {
             document.getElementById('documentSearchInput').value = '';
             document.getElementById('documentTypeFilter').value = '';
+            document.getElementById('documentCollectionFilter').value = '';
             currentSearchQuery = '';
             currentTypeFilter = '';
+            currentCollectionFilter = '';
             currentDocumentPage = 1;
 
-            loadDocuments(1, '', '');
+            loadDocuments(1, '', '', '');
         }
 
         async function refreshDocuments() {
-            await loadDocuments(currentDocumentPage, currentSearchQuery, currentTypeFilter);
+            await loadDocuments(currentDocumentPage, currentSearchQuery, currentTypeFilter, currentCollectionFilter);
         }
 
         function showStatus(message, type) {
@@ -1609,9 +1651,103 @@
             }
         });
 
+        // Collection management functions
+        async function loadCollections() {
+            try {
+                const response = await fetch('/collections');
+                const result = await response.json();
+
+                if (response.ok) {
+                    const collectionSelect = document.getElementById('collectionSelect');
+                    const queryCollectionSelect = document.getElementById('queryCollectionSelect');
+                    const documentCollectionFilter = document.getElementById('documentCollectionFilter');
+
+                    // Clear existing options
+                    collectionSelect.innerHTML = '';
+                    if (queryCollectionSelect) queryCollectionSelect.innerHTML = '';
+                    if (documentCollectionFilter) {
+                        documentCollectionFilter.innerHTML = '<option value="">All Collections</option>';
+                    }
+
+                    // Add collections to all dropdowns
+                    result.collections.forEach(collection => {
+                        const option = document.createElement('option');
+                        option.value = collection;
+                        option.textContent = collection === 'documents' ? `${collection} (default)` : collection;
+                        collectionSelect.appendChild(option);
+
+                        if (queryCollectionSelect) {
+                            const queryOption = option.cloneNode(true);
+                            queryCollectionSelect.appendChild(queryOption);
+                        }
+
+                        if (documentCollectionFilter) {
+                            const docOption = document.createElement('option');
+                            docOption.value = collection;
+                            docOption.textContent = collection === 'documents' ? `${collection} (default)` : collection;
+                            documentCollectionFilter.appendChild(docOption);
+                        }
+                    });
+                } else {
+                    console.error('Failed to load collections:', result.detail);
+                }
+            } catch (error) {
+                console.error('Error loading collections:', error);
+            }
+        }
+
+        async function createNewCollection() {
+            const newCollectionInput = document.getElementById('newCollectionName');
+            const collectionName = newCollectionInput.value.trim();
+
+            if (!collectionName) {
+                alert('Please enter a collection name.');
+                return;
+            }
+
+            // Basic validation
+            if (!/^[a-zA-Z0-9_-]+$/.test(collectionName)) {
+                alert('Collection name can only contain letters, numbers, hyphens, and underscores.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/collections', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        collection_name: collectionName
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showStatus(`Collection "${collectionName}" created successfully!`, 'success');
+                    newCollectionInput.value = '';
+                    await loadCollections();
+
+                    // Select the new collection
+                    document.getElementById('collectionSelect').value = collectionName;
+                } else {
+                    showStatus(`Error creating collection: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error creating collection: ${error.message}`, 'error');
+            }
+        }
+
+        async function refreshCollections() {
+            await loadCollections();
+            showStatus('Collections refreshed!', 'success');
+        }
+
         // Initialize document loading when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            loadDocuments(1, '', '');
+            loadDocuments(1, '', '', '');
+            loadCollections();
         });
     </script>
 </body>

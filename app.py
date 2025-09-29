@@ -66,10 +66,15 @@ class QueryRequest(BaseModel):
     question: str
     max_results: Optional[int] = 5
     pipeline: Optional[str] = "openai"  # "openai" or "huggingface"
+    collection_name: Optional[str] = "documents"
 
 class SearchRequest(BaseModel):
     question: str
     max_results: Optional[int] = 5
+    collection_name: Optional[str] = "documents"
+
+class CollectionRequest(BaseModel):
+    collection_name: str
 
 class QueryResponse(BaseModel):
     answer: str
@@ -94,7 +99,10 @@ async def home(request: Request):
     })
 
 @app.post("/upload")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    collection_name: Optional[str] = Form("documents")
+):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
 
@@ -108,20 +116,21 @@ async def upload_document(file: UploadFile = File(...)):
         text_content = content.decode('utf-8')
 
         if file.filename.endswith('.xml'):
-            document_id = current_rag.add_xml_document(text_content, file.filename)
+            document_id = current_rag.add_xml_document(text_content, file.filename, collection_name)
             doc_type = "XML"
         elif file.filename.endswith('.json'):
-            document_id = current_rag.add_json_document(text_content, file.filename)
+            document_id = current_rag.add_json_document(text_content, file.filename, collection_name)
             doc_type = "JSON"
         else:
-            document_id = current_rag.add_text_document(text_content, file.filename)
+            document_id = current_rag.add_text_document(text_content, file.filename, collection_name)
             doc_type = "TEXT"
 
         return {
-            "message": f"{doc_type} document uploaded successfully",
+            "message": f"{doc_type} document uploaded successfully to collection '{collection_name}'",
             "document_id": document_id,
             "filename": file.filename,
-            "document_type": doc_type.lower()
+            "document_type": doc_type.lower(),
+            "collection_name": collection_name
         }
 
     except Exception as e:
@@ -210,7 +219,8 @@ async def query_documents(query_request: QueryRequest):
 
         result = selected_rag.query(
             question=query_request.question,
-            n_results=query_request.max_results
+            n_results=query_request.max_results,
+            collection_name=query_request.collection_name
         )
         return result
 
@@ -226,7 +236,8 @@ async def search_documents(search_request: SearchRequest):
         # Use current_rag for searching (both pipelines use same vector store)
         search_results = current_rag.search_documents(
             query=search_request.question,
-            n_results=search_request.max_results
+            n_results=search_request.max_results,
+            collection_name=search_request.collection_name
         )
 
         # Format results for response
@@ -259,7 +270,8 @@ async def list_documents(
     page: int = 1,
     per_page: int = 10,
     search: Optional[str] = None,
-    document_type: Optional[str] = None
+    document_type: Optional[str] = None,
+    collection_name: Optional[str] = None
 ):
     if not current_rag:
         return {
@@ -272,8 +284,8 @@ async def list_documents(
             "has_prev": False
         }
 
-    # Get all documents
-    all_documents = current_rag.list_documents()
+    # Get all documents from specified collection (or default collection if None)
+    all_documents = current_rag.list_documents(collection_name)
 
     # Apply filters
     filtered_documents = all_documents
@@ -315,12 +327,12 @@ async def list_documents(
     }
 
 @app.get("/documents/{document_id}")
-async def get_document(document_id: str):
+async def get_document(document_id: str, collection_name: Optional[str] = None):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available")
 
     try:
-        document = current_rag.get_document_content(document_id)
+        document = current_rag.get_document_content(document_id, collection_name)
         if document is None:
             raise HTTPException(status_code=404, detail="Document not found")
         return document
@@ -339,6 +351,36 @@ async def delete_document(document_id: str):
         return {"message": f"Document {document_id} deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
+
+@app.get("/collections")
+async def list_collections():
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        collections = current_rag.list_collections()
+        return {"collections": collections}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing collections: {str(e)}")
+
+@app.post("/collections")
+async def create_collection(collection_request: CollectionRequest):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        success = current_rag.create_collection(collection_request.collection_name)
+        if success:
+            return {
+                "message": f"Collection '{collection_request.collection_name}' created successfully",
+                "collection_name": collection_request.collection_name
+            }
+        else:
+            raise HTTPException(status_code=400, detail=f"Collection '{collection_request.collection_name}' already exists")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating collection: {str(e)}")
 
 @app.get("/pipelines/info")
 async def get_pipeline_info():

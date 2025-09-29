@@ -14,17 +14,56 @@ class VectorStore:
         )
 
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-        self.collection_name = "documents"
+        self.default_collection_name = "documents"
+
+        # Cache for collections to avoid repeated lookups
+        self._collections = {}
+
+        # Ensure default collection exists
+        self._get_or_create_collection(self.default_collection_name)
+
+    def _get_or_create_collection(self, collection_name: str):
+        """Get or create a collection and cache it"""
+        if collection_name in self._collections:
+            return self._collections[collection_name]
 
         try:
-            self.collection = self.client.get_collection(self.collection_name)
+            collection = self.client.get_collection(collection_name)
         except:
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
+            collection = self.client.create_collection(
+                name=collection_name,
                 metadata={"description": "XML, JSON, and text documents with metadata"}
             )
 
-    def add_document(self, document_data: Dict[str, Any]) -> str:
+        self._collections[collection_name] = collection
+        return collection
+
+    def list_collections(self) -> List[str]:
+        """List all available collections"""
+        collections = self.client.list_collections()
+        return [col.name for col in collections]
+
+    def create_collection(self, collection_name: str) -> bool:
+        """Create a new collection"""
+        try:
+            if collection_name in [col.name for col in self.client.list_collections()]:
+                return False  # Collection already exists
+
+            collection = self.client.create_collection(
+                name=collection_name,
+                metadata={"description": "XML, JSON, and text documents with metadata"}
+            )
+            self._collections[collection_name] = collection
+            return True
+        except Exception as e:
+            print(f"Error creating collection {collection_name}: {e}")
+            return False
+
+    def add_document(self, document_data: Dict[str, Any], collection_name: str = None) -> str:
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        collection = self._get_or_create_collection(collection_name)
         doc_id = str(uuid.uuid4())
 
         text_chunks = document_data.get("text_chunks", [])
@@ -53,7 +92,7 @@ class VectorStore:
             chunk_documents.append(chunk)
         chunk_embeddings = self.embedding_model.encode(chunk_documents).tolist()
 
-        self.collection.add(
+        collection.add(
             embeddings=chunk_embeddings,
             documents=chunk_documents,
             metadatas=chunk_metadatas,
@@ -62,10 +101,14 @@ class VectorStore:
 
         return doc_id
 
-    def search(self, query: str, n_results: int = 5, where: Optional[Dict] = None) -> List[Dict[str, Any]]:
+    def search(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None) -> List[Dict[str, Any]]:
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        collection = self._get_or_create_collection(collection_name)
         query_embedding = self.embedding_model.encode([query]).tolist()
 
-        results = self.collection.query(
+        results = collection.query(
             query_embeddings=query_embedding,
             n_results=n_results,
             where=where,
@@ -83,19 +126,31 @@ class VectorStore:
 
         return formatted_results
 
-    def delete_document(self, document_id: str):
-        existing_chunks = self.collection.get(
+    def delete_document(self, document_id: str, collection_name: str = None):
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        collection = self._get_or_create_collection(collection_name)
+        existing_chunks = collection.get(
             where={"document_id": document_id}
         )
 
         if existing_chunks["ids"]:
-            self.collection.delete(ids=existing_chunks["ids"])
+            collection.delete(ids=existing_chunks["ids"])
 
-    def get_document_count(self) -> int:
-        return self.collection.count()
+    def get_document_count(self, collection_name: str = None) -> int:
+        if collection_name is None:
+            collection_name = self.default_collection_name
 
-    def list_documents(self) -> List[Dict[str, Any]]:
-        all_data = self.collection.get(include=["metadatas"])
+        collection = self._get_or_create_collection(collection_name)
+        return collection.count()
+
+    def list_documents(self, collection_name: str = None) -> List[Dict[str, Any]]:
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        collection = self._get_or_create_collection(collection_name)
+        all_data = collection.get(include=["metadatas"])
 
         documents = {}
         for metadata in all_data["metadatas"]:
@@ -133,8 +188,12 @@ class VectorStore:
 
         return list(documents.values())
 
-    def get_document_content(self, document_id: str) -> Optional[Dict[str, Any]]:
-        chunks = self.collection.get(
+    def get_document_content(self, document_id: str, collection_name: str = None) -> Optional[Dict[str, Any]]:
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        collection = self._get_or_create_collection(collection_name)
+        chunks = collection.get(
             where={"document_id": document_id},
             include=["documents", "metadatas"]
         )

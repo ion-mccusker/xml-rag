@@ -23,32 +23,32 @@ class RAGPipeline:
 
         self.openai_client = openai.OpenAI(api_key=api_key)
 
-    def add_xml_document(self, xml_content: str, filename: str = None) -> str:
+    def add_xml_document(self, xml_content: str, filename: str = None, collection_name: str = None) -> str:
         document_data = self.xml_processor.extract_text_and_metadata(xml_content, filename)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def add_json_document(self, json_content: str, filename: str = None) -> str:
+    def add_json_document(self, json_content: str, filename: str = None, collection_name: str = None) -> str:
         document_data = self.json_processor.extract_text_and_metadata(json_content, filename)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def add_xml_file(self, file_path: str) -> str:
+    def add_xml_file(self, file_path: str, collection_name: str = None) -> str:
         document_data = self.xml_processor.process_file(file_path)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def add_text_document(self, text_content: str, filename: str = None) -> str:
+    def add_text_document(self, text_content: str, filename: str = None, collection_name: str = None) -> str:
         document_data = self.text_processor.extract_text_and_metadata(text_content, filename)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def add_json_file(self, file_path: str) -> str:
+    def add_json_file(self, file_path: str, collection_name: str = None) -> str:
         document_data = self.json_processor.process_file(file_path)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def add_text_file(self, file_path: str) -> str:
+    def add_text_file(self, file_path: str, collection_name: str = None) -> str:
         document_data = self.text_processor.process_file(file_path)
-        return self.vector_store.add_document(document_data)
+        return self.vector_store.add_document(document_data, collection_name)
 
-    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None) -> List[Dict[str, Any]]:
-        return self.vector_store.search(query, n_results, where)
+    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None) -> List[Dict[str, Any]]:
+        return self.vector_store.search(query, n_results, where, collection_name)
 
     def generate_answer(self, query: str, context_results: List[Dict[str, Any]], model: str = "gpt-3.5-turbo") -> str:
         context_text = "\n\n".join([
@@ -82,8 +82,8 @@ Please provide a comprehensive answer based on the context above."""
         except Exception as e:
             return f"Error generating response: {str(e)}"
 
-    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, model: str = "gpt-3.5-turbo") -> Dict[str, Any]:
-        search_results = self.search_documents(question, n_results, where)
+    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, model: str = "gpt-3.5-turbo", collection_name: str = None) -> Dict[str, Any]:
+        search_results = self.search_documents(question, n_results, where, collection_name)
 
         if not search_results:
             return {
@@ -115,14 +115,20 @@ Please provide a comprehensive answer based on the context above."""
             "retrieved_chunks": search_results
         }
 
-    def delete_document(self, document_id: str):
-        self.vector_store.delete_document(document_id)
+    def delete_document(self, document_id: str, collection_name: str = None):
+        self.vector_store.delete_document(document_id, collection_name)
 
-    def list_documents(self) -> List[Dict[str, Any]]:
-        return self.vector_store.list_documents()
+    def list_documents(self, collection_name: str = None) -> List[Dict[str, Any]]:
+        return self.vector_store.list_documents(collection_name)
 
-    def get_document_count(self) -> int:
-        return self.vector_store.get_document_count()
+    def get_document_count(self, collection_name: str = None) -> int:
+        return self.vector_store.get_document_count(collection_name)
 
-    def get_document_content(self, document_id: str):
-        return self.vector_store.get_document_content(document_id)
+    def get_document_content(self, document_id: str, collection_name: str = None):
+        return self.vector_store.get_document_content(document_id, collection_name)
+
+    def list_collections(self) -> List[str]:
+        return self.vector_store.list_collections()
+
+    def create_collection(self, collection_name: str) -> bool:
+        return self.vector_store.create_collection(collection_name)
