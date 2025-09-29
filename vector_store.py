@@ -4,10 +4,11 @@ from typing import List, Dict, Any, Optional
 import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
+from document_storage import DocumentStorage
 
 
 class VectorStore:
-    def __init__(self, persist_directory: str = "./chroma_db"):
+    def __init__(self, persist_directory: str = "./chroma_db", storage_directory: str = "./document_storage"):
         self.client = chromadb.PersistentClient(
             path=persist_directory,
             settings=Settings(anonymized_telemetry=False)
@@ -15,6 +16,9 @@ class VectorStore:
 
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.default_collection_name = "documents"
+
+        # Initialize document storage
+        self.document_storage = DocumentStorage(storage_directory)
 
         # Cache for collections to avoid repeated lookups
         self._collections = {}
@@ -39,15 +43,20 @@ class VectorStore:
         return collection
 
     def list_collections(self) -> List[str]:
-        """List all available collections"""
-        collections = self.client.list_collections()
-        return [col.name for col in collections]
+        """List all available collections from document storage"""
+        return self.document_storage.list_collections()
 
     def create_collection(self, collection_name: str) -> bool:
-        """Create a new collection"""
+        """Create a new collection in both vector DB and document storage"""
         try:
+            # Create in document storage first
+            storage_success = self.document_storage.create_collection(collection_name)
+            if not storage_success:
+                return False
+
+            # Create in vector database
             if collection_name in [col.name for col in self.client.list_collections()]:
-                return False  # Collection already exists
+                return True  # Vector collection already exists, storage creation succeeded
 
             collection = self.client.create_collection(
                 name=collection_name,
@@ -64,14 +73,24 @@ class VectorStore:
             collection_name = self.default_collection_name
 
         collection = self._get_or_create_collection(collection_name)
-        doc_id = str(uuid.uuid4())
 
         text_chunks = document_data.get("text_chunks", [])
         metadata = document_data.get("metadata", {})
+        full_content = document_data.get("full_content", "")
+        filename = metadata.get("filename", "unknown")
 
         if not text_chunks:
             raise ValueError("No text chunks found in document")
 
+        # Store the full document in filesystem
+        doc_id = self.document_storage.store_document(
+            content=full_content,
+            filename=filename,
+            metadata=metadata,
+            collection_name=collection_name
+        )
+
+        # Store only chunk embeddings and minimal metadata in vector DB
         chunk_ids = []
         chunk_embeddings = []
         chunk_metadatas = []
@@ -81,15 +100,20 @@ class VectorStore:
             chunk_id = f"{doc_id}_chunk_{i}"
             chunk_ids.append(chunk_id)
 
-            chunk_metadata = metadata.copy()
-            chunk_metadata.update({
+            # Minimal metadata for vector search - no full content
+            chunk_metadata = {
                 "chunk_index": i,
                 "document_id": doc_id,
-                "chunk_length": len(chunk)
-            })
+                "chunk_length": len(chunk),
+                "filename": filename,
+                "document_type": metadata.get("document_type", "unknown"),
+                "collection_name": collection_name
+            }
 
             chunk_metadatas.append(chunk_metadata)
+            # Store chunk text for search, but full content is in filesystem
             chunk_documents.append(chunk)
+
         chunk_embeddings = self.embedding_model.encode(chunk_documents).tolist()
 
         collection.add(
@@ -130,6 +154,10 @@ class VectorStore:
         if collection_name is None:
             collection_name = self.default_collection_name
 
+        # Delete from filesystem storage
+        self.document_storage.delete_document(document_id, collection_name)
+
+        # Delete from vector database
         collection = self._get_or_create_collection(collection_name)
         existing_chunks = collection.get(
             where={"document_id": document_id}
@@ -145,50 +173,30 @@ class VectorStore:
         collection = self._get_or_create_collection(collection_name)
         return collection.count()
 
-    def list_documents(self, collection_name: str = None) -> List[Dict[str, Any]]:
-        if collection_name is None:
-            collection_name = self.default_collection_name
-
-        collection = self._get_or_create_collection(collection_name)
-        all_data = collection.get(include=["metadatas"])
-
-        documents = {}
-        for metadata in all_data["metadatas"]:
-            doc_id = metadata.get("document_id")
-            if doc_id and doc_id not in documents:
-                doc_type = metadata.get("document_type", "xml")
-
-                if doc_type == "json":
-                    documents[doc_id] = {
-                        "document_id": doc_id,
-                        "filename": metadata.get("filename", "unknown"),
-                        "document_type": doc_type,
-                        "data_type": metadata.get("data_type", ""),
-                        "total_keys": metadata.get("total_keys", 0),
-                        "structure_summary": metadata.get("structure_summary", "")
-                    }
-                elif doc_type == "text":
-                    documents[doc_id] = {
-                        "document_id": doc_id,
-                        "filename": metadata.get("filename", "unknown"),
-                        "document_type": doc_type,
-                        "total_words": metadata.get("total_words", 0),
-                        "total_lines": metadata.get("total_lines", 0),
-                        "title": metadata.get("title", ""),
-                        "language_hints": metadata.get("language_hints", [])
-                    }
-                else:
-                    documents[doc_id] = {
-                        "document_id": doc_id,
-                        "filename": metadata.get("filename", "unknown"),
-                        "document_type": doc_type,
-                        "root_tag": metadata.get("root_tag", ""),
-                        "element_count": metadata.get("element_count", 0)
-                    }
-
-        return list(documents.values())
+    def list_documents(self, collection_name: str = None, page: int = 1, per_page: int = 10,
+                      search: str = None, document_type: str = None) -> Dict[str, Any]:
+        """Use filesystem storage for efficient document listing with pagination"""
+        return self.document_storage.list_documents(
+            collection_name=collection_name,
+            search=search,
+            document_type=document_type,
+            page=page,
+            per_page=per_page
+        )
 
     def get_document_content(self, document_id: str, collection_name: str = None) -> Optional[Dict[str, Any]]:
+        """Get document content from filesystem storage"""
+        # Get metadata from filesystem
+        doc_metadata = self.document_storage.get_document_metadata(document_id, collection_name)
+        if not doc_metadata:
+            return None
+
+        # Get full content from filesystem
+        full_content = self.document_storage.get_document_content(document_id, collection_name)
+        if full_content is None:
+            return None
+
+        # Get chunks from vector database for compatibility
         if collection_name is None:
             collection_name = self.default_collection_name
 
@@ -198,24 +206,18 @@ class VectorStore:
             include=["documents", "metadatas"]
         )
 
-        if not chunks["documents"]:
-            return None
+        # Sort chunks by chunk_index
+        chunk_data = []
+        if chunks["documents"]:
+            chunk_data = list(zip(chunks["documents"], chunks["metadatas"]))
+            chunk_data.sort(key=lambda x: x[1].get("chunk_index", 0))
 
-        # Sort chunks by chunk_index to reconstruct original order
-        chunk_data = list(zip(chunks["documents"], chunks["metadatas"]))
-        chunk_data.sort(key=lambda x: x[1].get("chunk_index", 0))
-
-        sorted_chunks = [chunk[0] for chunk in chunk_data]
-        metadata = chunk_data[0][1] if chunk_data else {}
-
-        # Remove chunk-specific metadata
-        clean_metadata = {k: v for k, v in metadata.items()
-                         if k not in ["chunk_index", "chunk_length"]}
+        sorted_chunks = [chunk[0] for chunk in chunk_data] if chunk_data else []
 
         return {
             "document_id": document_id,
-            "metadata": clean_metadata,
+            "metadata": doc_metadata,
             "chunks": sorted_chunks,
-            "full_content": "\n\n".join(sorted_chunks),
+            "full_content": full_content,
             "total_chunks": len(sorted_chunks)
         }

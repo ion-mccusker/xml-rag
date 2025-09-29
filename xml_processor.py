@@ -22,6 +22,7 @@ class XMLProcessor:
             "metadata": metadata,
             "text_chunks": text_chunks,
             "full_text": " ".join(text_chunks),
+            "full_content": xml_content,  # Store original content for filesystem
             "document_type": "xml"
         }
 

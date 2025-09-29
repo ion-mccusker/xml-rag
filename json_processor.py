@@ -26,6 +26,7 @@ class JSONProcessor:
             "metadata": metadata,
             "text_chunks": text_chunks,
             "full_text": " ".join(text_chunks),
+            "full_content": json_content,  # Store original content for filesystem
             "document_type": "json"
         }
 
@@ -240,5 +241,6 @@ class JSONProcessor:
             "metadata": metadata,
             "text_chunks": text_chunks,
             "full_text": " ".join(text_chunks),
+            "full_content": json.dumps(data, indent=2),  # Store original content for filesystem
             "document_type": "json"
         }

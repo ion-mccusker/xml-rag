@@ -284,47 +284,14 @@ async def list_documents(
             "has_prev": False
         }
 
-    # Get all documents from specified collection (or default collection if None)
-    all_documents = current_rag.list_documents(collection_name)
-
-    # Apply filters
-    filtered_documents = all_documents
-
-    if search:
-        search_lower = search.lower()
-        filtered_documents = [
-            doc for doc in filtered_documents
-            if (search_lower in doc.get('filename', '').lower() or
-                search_lower in doc.get('title', '').lower() or
-                search_lower in str(doc.get('content', '')).lower())
-        ]
-
-    if document_type:
-        filtered_documents = [
-            doc for doc in filtered_documents
-            if doc.get('document_type', '').lower() == document_type.lower()
-        ]
-
-    # Calculate pagination
-    total_count = len(filtered_documents)
-    total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
-    page = max(1, min(page, total_pages))
-
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_documents = filtered_documents[start_idx:end_idx]
-
-    return {
-        "documents": paginated_documents,
-        "total_count": total_count,
-        "page": page,
-        "per_page": per_page,
-        "total_pages": total_pages,
-        "has_next": page < total_pages,
-        "has_prev": page > 1,
-        "start_index": start_idx + 1 if paginated_documents else 0,
-        "end_index": min(end_idx, total_count)
-    }
+    # Use the new filesystem-based document listing with pagination
+    return current_rag.list_documents(
+        collection_name=collection_name,
+        page=page,
+        per_page=per_page,
+        search=search,
+        document_type=document_type
+    )
 
 @app.get("/documents/{document_id}")
 async def get_document(document_id: str, collection_name: Optional[str] = None):

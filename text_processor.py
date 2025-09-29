@@ -20,6 +20,7 @@ class TextProcessor:
             "metadata": metadata,
             "text_chunks": text_chunks,
             "full_text": text_content,
+            "full_content": text_content,  # Store original content for filesystem
             "document_type": "text"
         }
 

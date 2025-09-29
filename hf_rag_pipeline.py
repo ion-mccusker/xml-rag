@@ -171,8 +171,15 @@ Answer:"""
     def delete_document(self, document_id: str, collection_name: str = None):
         self.vector_store.delete_document(document_id, collection_name)
 
-    def list_documents(self, collection_name: str = None) -> List[Dict[str, Any]]:
-        return self.vector_store.list_documents(collection_name)
+    def list_documents(self, collection_name: str = None, page: int = 1, per_page: int = 10,
+                      search: str = None, document_type: str = None) -> Dict[str, Any]:
+        return self.vector_store.list_documents(
+            collection_name=collection_name,
+            page=page,
+            per_page=per_page,
+            search=search,
+            document_type=document_type
+        )
 
     def get_document_count(self, collection_name: str = None) -> int:
         return self.vector_store.get_document_count(collection_name)
