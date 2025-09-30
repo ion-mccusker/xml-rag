@@ -496,7 +496,7 @@
         <div class="header">
             <h1>Document RAG System</h1>
             <p>Upload XML, JSON, and text documents and ask questions about their content</p>
-            <p><strong>Documents in database: {{ document_count }}</strong></p>
+            <p><strong>Documents in database: <span id="totalDocumentCount">{{ document_count }}</span></strong></p>
         </div>
 
         <div class="section">
@@ -827,6 +827,7 @@
 
                 fileInput.value = '';
                 refreshDocuments();
+                updateTotalDocumentCount();
 
             } catch (error) {
                 showStatus(`Error during upload: ${error.message}`, 'error');
@@ -866,12 +867,32 @@
                     statusElement.textContent = 'Success';
                     progressBar.style.width = '100%';
                     progressBar.textContent = '100%';
+                    // Auto-hide successful uploads after 2 seconds
+                    setTimeout(() => {
+                        tracker.element.style.transition = 'opacity 0.5s ease-out';
+                        tracker.element.style.opacity = '0';
+                        setTimeout(() => {
+                            if (tracker.element.parentNode) {
+                                tracker.element.parentNode.removeChild(tracker.element);
+                            }
+                        }, 500); // Wait for fade-out animation to complete
+                    }, 2000);
                     break;
                 case 'error':
                     statusElement.textContent = 'Error';
                     progressBar.style.width = '100%';
                     progressBar.textContent = 'Error';
                     progressBar.style.background = 'linear-gradient(45deg, #dc3545, #c82333)';
+                    // Auto-hide error uploads after 5 seconds (longer so user can see the error)
+                    setTimeout(() => {
+                        tracker.element.style.transition = 'opacity 0.5s ease-out';
+                        tracker.element.style.opacity = '0';
+                        setTimeout(() => {
+                            if (tracker.element.parentNode) {
+                                tracker.element.parentNode.removeChild(tracker.element);
+                            }
+                        }, 500);
+                    }, 5000);
                     break;
                 default:
                     statusElement.textContent = 'Waiting';
@@ -1651,6 +1672,21 @@
             }
         });
 
+        // Update total document count
+        async function updateTotalDocumentCount() {
+            try {
+                // Get total count across all collections
+                const response = await fetch('/documents?per_page=1&page=1');
+                const result = await response.json();
+
+                if (response.ok && result.total_count !== undefined) {
+                    document.getElementById('totalDocumentCount').textContent = result.total_count;
+                }
+            } catch (error) {
+                console.error('Error updating document count:', error);
+            }
+        }
+
         // Collection management functions
         async function loadCollections() {
             try {
@@ -1728,6 +1764,7 @@
                     showStatus(`Collection "${collectionName}" created successfully!`, 'success');
                     newCollectionInput.value = '';
                     await loadCollections();
+                    updateTotalDocumentCount();
 
                     // Select the new collection
                     document.getElementById('collectionSelect').value = collectionName;
@@ -1748,6 +1785,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadDocuments(1, '', '', '');
             loadCollections();
+            updateTotalDocumentCount();
         });
     </script>
 </body>

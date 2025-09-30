@@ -212,3 +212,7 @@ __marimo__/
 # Chroma
 
 chroma_db/**
+
+# File storage
+
+document_storage/**

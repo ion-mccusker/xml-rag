@@ -180,9 +180,13 @@ class DocumentStorage:
         for collection in collections_to_search:
             index_file = self.collections_dir / collection / "index.json"
             if index_file.exists():
-                with open(index_file, 'r') as f:
-                    index = json.load(f)
-                    all_documents.extend(index.values())
+                try:
+                    with open(index_file, 'r') as f:
+                        index = json.load(f)
+                        all_documents.extend(index.values())
+                except (json.JSONDecodeError, FileNotFoundError):
+                    # Skip corrupted or missing index files
+                    continue
 
         # Apply filters
         filtered_documents = all_documents

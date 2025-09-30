@@ -88,11 +88,19 @@ class SearchResponse(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    documents = current_rag.list_documents() if current_rag else []
+    if current_rag:
+        # Get first page of documents for display
+        document_data = current_rag.list_documents(collection_name=None, page=1, per_page=10)
+        documents = document_data.get("documents", [])
+        total_document_count = document_data.get("total_count", 0)
+    else:
+        documents = []
+        total_document_count = 0
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "documents": documents,
-        "document_count": len(documents),
+        "document_count": total_document_count,
         "openai_available": openai_available,
         "hf_available": hf_available,
         "pipelines_available": pipelines_available
