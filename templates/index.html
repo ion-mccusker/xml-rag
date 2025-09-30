@@ -658,7 +658,10 @@
         <div class="chunk-modal-content">
             <div class="chunk-modal-header">
                 <h3 id="chunkModalTitle">Chunk Content</h3>
-                <button class="close-modal" onclick="closeChunkModal()">Close</button>
+                <div style="display: flex; gap: 10px;">
+                    <button id="viewFullDocumentBtn" onclick="viewFullDocumentFromChunk()" style="padding: 6px 12px; font-size: 12px; background-color: #17a2b8; color: white; border: none; border-radius: 5px; cursor: pointer;">View Full Document</button>
+                    <button class="close-modal" onclick="closeChunkModal()">Close</button>
+                </div>
             </div>
             <div class="chunk-modal-body">
                 <div class="metadata-section">
@@ -1038,6 +1041,7 @@
 
         // Store chunks globally for modal access
         let currentChunks = [];
+        let currentChunkInfo = null; // Store current chunk document info for full document view
 
         function displayQueryResults(result) {
             const resultsDiv = document.getElementById('queryResults');
@@ -1160,6 +1164,13 @@
 
             const chunk = window.currentSearchResults[index];
             const docType = chunk.document_type || 'xml';
+
+            // Store current chunk info for full document viewing
+            currentChunkInfo = {
+                document_id: chunk.document_id,
+                filename: chunk.filename,
+                collection_name: chunk.metadata?.collection_name || null
+            };
 
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
@@ -1521,7 +1532,7 @@
             }
         }
 
-        async function viewDocument(documentId, filename) {
+        async function viewDocument(documentId, filename, collectionName = null) {
             const modal = document.getElementById('documentModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalContent = document.getElementById('modalContent');
@@ -1531,7 +1542,12 @@
             modal.style.display = 'block';
 
             try {
-                const response = await fetch(`/documents/${documentId}`);
+                let url = `/documents/${documentId}`;
+                if (collectionName) {
+                    url += `?collection_name=${encodeURIComponent(collectionName)}`;
+                }
+
+                const response = await fetch(url);
                 const result = await response.json();
 
                 if (response.ok) {
@@ -1549,6 +1565,29 @@
             modal.style.display = 'none';
         }
 
+        function closeChunkModal() {
+            const modal = document.getElementById('chunkModal');
+            modal.style.display = 'none';
+            currentChunkInfo = null;
+        }
+
+        async function viewFullDocumentFromChunk() {
+            if (!currentChunkInfo) {
+                alert('No document information available');
+                return;
+            }
+
+            try {
+                // Close the chunk modal first
+                closeChunkModal();
+
+                // Use the existing viewDocument function with collection support
+                await viewDocument(currentChunkInfo.document_id, currentChunkInfo.filename, currentChunkInfo.collection_name);
+            } catch (error) {
+                alert(`Error loading full document: ${error.message}`);
+            }
+        }
+
         function viewChunkByIndex(index, type) {
             const modal = document.getElementById('chunkModal');
             const modalTitle = document.getElementById('chunkModalTitle');
@@ -1564,6 +1603,13 @@
                 chunkIndex = chunk.metadata.chunk_index;
                 docType = chunk.metadata.document_type || 'xml';
                 metadata = chunk.metadata;
+
+                // Store current chunk info for full document viewing
+                currentChunkInfo = {
+                    document_id: chunk.metadata.document_id,
+                    filename: filename,
+                    collection_name: chunk.metadata.collection_name || null
+                };
             } else if (type === 'source') {
                 chunk = window.currentSources[index];
                 content = chunk.full_content;
@@ -1571,6 +1617,13 @@
                 chunkIndex = chunk.chunk_index;
                 docType = chunk.document_type || 'xml';
                 metadata = chunk.metadata || {};
+
+                // Store current chunk info for full document viewing
+                currentChunkInfo = {
+                    document_id: chunk.document_id,
+                    filename: filename,
+                    collection_name: metadata.collection_name || null
+                };
             }
 
             modalTitle.innerHTML = `
