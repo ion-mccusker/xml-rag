@@ -514,6 +514,29 @@
                 </div>
                 <button onclick="refreshCollections()" style="padding: 8px 12px; font-size: 12px; background-color: #6c757d; border: none; color: white; border-radius: 5px; cursor: pointer;">Refresh</button>
             </div>
+
+            <!-- Chunk Configuration -->
+            <div style="margin-bottom: 15px; padding: 12px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">📝 Chunking Configuration</h4>
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="chunkSize" style="font-weight: bold; color: #333; font-size: 13px;">Chunk Size:</label>
+                        <input type="number" id="chunkSize" value="1000" min="100" max="4000" step="100" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 80px;">
+                        <span style="color: #666; font-size: 12px;">chars</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="chunkOverlap" style="font-weight: bold; color: #333; font-size: 13px;">Overlap:</label>
+                        <input type="number" id="chunkOverlap" value="200" min="0" max="1000" step="50" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 80px;">
+                        <span style="color: #666; font-size: 12px;">chars</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button onclick="validateChunkConfig()" style="padding: 6px 12px; font-size: 12px; background-color: #28a745; border: none; color: white; border-radius: 4px; cursor: pointer;">✓ Validate</button>
+                    </div>
+                </div>
+                <div style="margin-top: 8px; font-size: 11px; color: #666;">
+                    💡 <strong>Tip:</strong> Larger chunks preserve more context but may be less precise. Overlap helps maintain continuity between chunks.
+                </div>
+            </div>
             <div class="upload-area">
                 <p>Select one or more XML, JSON, or text files to upload</p>
                 <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
@@ -738,6 +761,11 @@
                         formData.append('collection_name', collectionSelect.value);
                     }
 
+                    // Add chunk configuration
+                    const chunkConfig = getChunkConfig();
+                    formData.append('chunk_size', chunkConfig.chunk_size.toString());
+                    formData.append('chunk_overlap', chunkConfig.chunk_overlap.toString());
+
                     const response = await fetch('/upload', {
                         method: 'POST',
                         body: formData
@@ -771,6 +799,11 @@
                         if (collectionSelect && collectionSelect.value) {
                             formData.append('collection_name', collectionSelect.value);
                         }
+
+                        // Add chunk configuration
+                        const chunkConfig = getChunkConfig();
+                        formData.append('chunk_size', chunkConfig.chunk_size.toString());
+                        formData.append('chunk_overlap', chunkConfig.chunk_overlap.toString());
 
                         try {
                             const response = await fetch('/upload', {
@@ -1832,6 +1865,47 @@
         async function refreshCollections() {
             await loadCollections();
             showStatus('Collections refreshed!', 'success');
+        }
+
+        // Chunk configuration validation
+        function validateChunkConfig() {
+            const chunkSize = parseInt(document.getElementById('chunkSize').value);
+            const chunkOverlap = parseInt(document.getElementById('chunkOverlap').value);
+
+            if (chunkOverlap >= chunkSize) {
+                alert('⚠️ Chunk overlap must be smaller than chunk size!');
+                document.getElementById('chunkOverlap').style.borderColor = '#dc3545';
+                return false;
+            }
+
+            if (chunkSize < 100) {
+                alert('⚠️ Chunk size should be at least 100 characters for meaningful content!');
+                document.getElementById('chunkSize').style.borderColor = '#dc3545';
+                return false;
+            }
+
+            // Reset border colors on valid input
+            document.getElementById('chunkSize').style.borderColor = '#28a745';
+            document.getElementById('chunkOverlap').style.borderColor = '#28a745';
+
+            // Show success message
+            showStatus(`✅ Chunk configuration validated: ${chunkSize} chars with ${chunkOverlap} overlap`, 'success');
+
+            // Reset border colors after a delay
+            setTimeout(() => {
+                document.getElementById('chunkSize').style.borderColor = '#ddd';
+                document.getElementById('chunkOverlap').style.borderColor = '#ddd';
+            }, 2000);
+
+            return true;
+        }
+
+        // Get current chunk configuration
+        function getChunkConfig() {
+            return {
+                chunk_size: parseInt(document.getElementById('chunkSize').value),
+                chunk_overlap: parseInt(document.getElementById('chunkOverlap').value)
+            };
         }
 
         // Initialize document loading when page loads

@@ -49,27 +49,35 @@ class HuggingFaceRAGPipeline:
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
-    def add_xml_document(self, xml_content: str, filename: str = None, collection_name: str = None) -> str:
+    def add_xml_document(self, xml_content: str, filename: str = None, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         document_data = self.xml_processor.extract_text_and_metadata(xml_content, filename)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def add_json_document(self, json_content: str, filename: str = None, collection_name: str = None) -> str:
+    def add_json_document(self, json_content: str, filename: str = None, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
+        # Update chunk configuration for this upload
+        self.json_processor.update_chunk_config(chunk_size, chunk_overlap)
         document_data = self.json_processor.extract_text_and_metadata(json_content, filename)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def add_text_document(self, text_content: str, filename: str = None, collection_name: str = None) -> str:
+    def add_text_document(self, text_content: str, filename: str = None, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
+        # Update chunk configuration for this upload
+        self.text_processor.update_chunk_config(chunk_size, chunk_overlap)
         document_data = self.text_processor.extract_text_and_metadata(text_content, filename)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def add_xml_file(self, file_path: str, collection_name: str = None) -> str:
+    def add_xml_file(self, file_path: str, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         document_data = self.xml_processor.process_file(file_path)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def add_json_file(self, file_path: str, collection_name: str = None) -> str:
+    def add_json_file(self, file_path: str, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
+        # Update chunk configuration for this upload
+        self.json_processor.update_chunk_config(chunk_size, chunk_overlap)
         document_data = self.json_processor.process_file(file_path)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def add_text_file(self, file_path: str, collection_name: str = None) -> str:
+    def add_text_file(self, file_path: str, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
+        # Update chunk configuration for this upload
+        self.text_processor.update_chunk_config(chunk_size, chunk_overlap)
         document_data = self.text_processor.process_file(file_path)
         return self.vector_store.add_document(document_data, collection_name)
 

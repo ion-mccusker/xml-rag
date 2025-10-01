@@ -2,12 +2,19 @@ import re
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import hashlib
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 class TextProcessor:
     def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 100):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
 
     def extract_text_and_metadata(self, text_content: str, filename: str = None) -> Dict[str, Any]:
         if not text_content or not text_content.strip():
@@ -54,34 +61,23 @@ class TextProcessor:
         return metadata
 
     def _create_chunks(self, content: str) -> List[str]:
-        if len(content) <= self.chunk_size:
-            return [content.strip()] if content.strip() else []
+        """Use LangChain's RecursiveCharacterTextSplitter for better chunking"""
+        if not content.strip():
+            return []
 
-        chunks = []
-        paragraphs = self._split_into_paragraphs(content)
+        chunks = self.text_splitter.split_text(content)
+        return [chunk.strip() for chunk in chunks if chunk.strip()]
 
-        current_chunk = ""
-        for paragraph in paragraphs:
-            if len(current_chunk) + len(paragraph) + 1 <= self.chunk_size:
-                if current_chunk:
-                    current_chunk += "\n\n" + paragraph
-                else:
-                    current_chunk = paragraph
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-
-                if len(paragraph) <= self.chunk_size:
-                    current_chunk = paragraph
-                else:
-                    sub_chunks = self._split_large_paragraph(paragraph)
-                    chunks.extend(sub_chunks[:-1])
-                    current_chunk = sub_chunks[-1] if sub_chunks else ""
-
-        if current_chunk.strip():
-            chunks.append(current_chunk.strip())
-
-        return self._apply_overlap(chunks)
+    def update_chunk_config(self, chunk_size: int, chunk_overlap: int):
+        """Update chunk configuration and recreate text splitter"""
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
 
     def _split_into_paragraphs(self, content: str) -> List[str]:
         paragraphs = re.split(r'\n\s*\n', content)

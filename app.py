@@ -109,7 +109,9 @@ async def home(request: Request):
 @app.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    collection_name: Optional[str] = Form("documents")
+    collection_name: Optional[str] = Form("documents"),
+    chunk_size: Optional[int] = Form(1000),
+    chunk_overlap: Optional[int] = Form(200)
 ):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
@@ -124,13 +126,13 @@ async def upload_document(
         text_content = content.decode('utf-8')
 
         if file.filename.endswith('.xml'):
-            document_id = current_rag.add_xml_document(text_content, file.filename, collection_name)
+            document_id = current_rag.add_xml_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
             doc_type = "XML"
         elif file.filename.endswith('.json'):
-            document_id = current_rag.add_json_document(text_content, file.filename, collection_name)
+            document_id = current_rag.add_json_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
             doc_type = "JSON"
         else:
-            document_id = current_rag.add_text_document(text_content, file.filename, collection_name)
+            document_id = current_rag.add_text_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
             doc_type = "TEXT"
 
         return {
@@ -151,7 +153,12 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Error processing {file_type}: {str(e)}")
 
 @app.post("/upload-batch")
-async def upload_batch_documents(files: List[UploadFile] = File(...)):
+async def upload_batch_documents(
+    files: List[UploadFile] = File(...),
+    collection_name: Optional[str] = Form("documents"),
+    chunk_size: Optional[int] = Form(1000),
+    chunk_overlap: Optional[int] = Form(200)
+):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
 
@@ -177,19 +184,20 @@ async def upload_batch_documents(files: List[UploadFile] = File(...)):
             text_content = content.decode('utf-8')
 
             if file.filename.endswith('.xml'):
-                document_id = current_rag.add_xml_document(text_content, file.filename)
+                document_id = current_rag.add_xml_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
                 doc_type = "XML"
             elif file.filename.endswith('.json'):
-                document_id = current_rag.add_json_document(text_content, file.filename)
+                document_id = current_rag.add_json_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
                 doc_type = "JSON"
             else:
-                document_id = current_rag.add_text_document(text_content, file.filename)
+                document_id = current_rag.add_text_document(text_content, file.filename, collection_name, chunk_size, chunk_overlap)
                 doc_type = "TEXT"
 
             result["success"] = True
             result["document_id"] = document_id
             result["document_type"] = doc_type.lower()
             result["message"] = f"{doc_type} document uploaded successfully"
+            result["collection_name"] = collection_name
             successful_uploads += 1
 
         except Exception as e:

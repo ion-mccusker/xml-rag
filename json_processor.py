@@ -2,11 +2,19 @@ import json
 from typing import Dict, List, Any, Optional, Union
 import re
 from pathlib import Path
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 class JSONProcessor:
-    def __init__(self):
-        pass
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
 
     def extract_text_and_metadata(self, json_content: str, filename: str = None) -> Dict[str, Any]:
         try:
@@ -60,8 +68,15 @@ class JSONProcessor:
                 if isinstance(value, str) and len(value.strip()) > 10:
                     clean_text = self._clean_text(value.strip())
                     if clean_text:
-                        chunk_with_context = f"{key}: {clean_text}"
-                        chunks.append(chunk_with_context)
+                        # For longer text values, use the text splitter
+                        if len(clean_text) > self.chunk_size // 2:
+                            text_chunks = self.text_splitter.split_text(clean_text)
+                            for i, chunk in enumerate(text_chunks):
+                                chunk_with_context = f"{key}[{i}]: {chunk}" if len(text_chunks) > 1 else f"{key}: {chunk}"
+                                chunks.append(chunk_with_context)
+                        else:
+                            chunk_with_context = f"{key}: {clean_text}"
+                            chunks.append(chunk_with_context)
                 elif isinstance(value, (dict, list)):
                     self._extract_text_chunks(value, current_path, chunks)
                 elif isinstance(value, (int, float, bool)) and value is not None:
@@ -74,7 +89,14 @@ class JSONProcessor:
                 if isinstance(item, str) and len(item.strip()) > 10:
                     clean_text = self._clean_text(item.strip())
                     if clean_text:
-                        chunks.append(f"Item {i}: {clean_text}")
+                        # For longer text values, use the text splitter
+                        if len(clean_text) > self.chunk_size // 2:
+                            text_chunks = self.text_splitter.split_text(clean_text)
+                            for j, chunk in enumerate(text_chunks):
+                                chunk_label = f"Item {i}[{j}]: {chunk}" if len(text_chunks) > 1 else f"Item {i}: {chunk}"
+                                chunks.append(chunk_label)
+                        else:
+                            chunks.append(f"Item {i}: {clean_text}")
                 elif isinstance(item, (dict, list)):
                     self._extract_text_chunks(item, current_path, chunks)
                 elif isinstance(item, (int, float, bool)) and item is not None:
@@ -162,6 +184,17 @@ class JSONProcessor:
 
         return self.extract_text_and_metadata(content, path.name)
 
+    def update_chunk_config(self, chunk_size: int, chunk_overlap: int):
+        """Update chunk configuration and recreate text splitter"""
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len,
+            separators=["\n\n", "\n", ". ", " ", ""]
+        )
+
     def _is_title_content_format(self, data: Any) -> bool:
         """Check if the JSON matches the specific format: {"title": "...", "content": "...", "metadata": {...}}"""
         if not isinstance(data, dict):
@@ -203,7 +236,7 @@ class JSONProcessor:
             elif isinstance(value, (list, dict)):
                 metadata[f"meta_{key}"] = str(value)
 
-        # Create text chunks from the content
+        # Create text chunks from the content using LangChain's text splitter
         text_chunks = []
 
         # Process the main content (don't include title in chunks)
@@ -211,25 +244,9 @@ class JSONProcessor:
             # Clean the content
             clean_content = self._clean_text(content)
             if clean_content:
-                # Split content into chunks if it's very long
-                if len(clean_content) > 1000:
-                    # Split into sentences and group them
-                    sentences = re.split(r'[.!?]+\s+', clean_content)
-                    current_chunk = ""
-
-                    for sentence in sentences:
-                        if len(current_chunk) + len(sentence) < 800:
-                            current_chunk += sentence + ". "
-                        else:
-                            if current_chunk.strip():
-                                text_chunks.append(current_chunk.strip())
-                            current_chunk = sentence + ". "
-
-                    # Add remaining content
-                    if current_chunk.strip():
-                        text_chunks.append(current_chunk.strip())
-                else:
-                    text_chunks.append(clean_content)
+                # Use LangChain's RecursiveCharacterTextSplitter for better chunking
+                chunks = self.text_splitter.split_text(clean_content)
+                text_chunks.extend(chunks)
 
         # Don't add metadata to text chunks - metadata should only be stored as metadata
 
