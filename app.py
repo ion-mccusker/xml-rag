@@ -263,7 +263,7 @@ async def search_documents(search_request: SearchRequest):
                 "document_type": result["metadata"].get("document_type", "unknown"),
                 "chunk_index": result["metadata"].get("chunk_index", 0),
                 "distance": result["distance"],
-                "relevance_score": round(1 - result["distance"], 3),
+                "relevance_score": round(1 - (result["distance"] / 2), 3),
                 "content": result["document"],
                 "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
                 "document_id": result["metadata"].get("document_id", ""),

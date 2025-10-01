@@ -1100,7 +1100,7 @@
                         <div style="margin-bottom: 8px;">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
                             <strong>Chunk ${index + 1}:</strong> ${chunk.metadata.filename} (chunk ${chunk.metadata.chunk_index})
-                            <span style="float: right; color: #666;">Relevance: ${(1 - chunk.distance).toFixed(3)}</span>
+                            <span style="float: right; color: #666;">Relevance: ${(1 - (chunk.distance / 2)).toFixed(3)}</span>
                         </div>
                         <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
                             <div class="chunk-content" style="max-height: 150px; overflow-y: auto; white-space: pre-wrap;" id="chunk-${index}">

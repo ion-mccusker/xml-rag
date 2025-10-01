@@ -110,7 +110,7 @@ Please provide a comprehensive answer based on the context above."""
                     "document_type": result["metadata"].get("document_type", "unknown"),
                     "chunk_index": result["metadata"].get("chunk_index", 0),
                     "distance": result["distance"],
-                    "relevance_score": round(1 - result["distance"], 3),
+                    "relevance_score": round(1 - (result["distance"] / 2), 3),
                     "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
                     "full_content": result["document"],
                     "content": result["document"],
