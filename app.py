@@ -8,9 +8,11 @@ from typing import Optional, List
 import uvicorn
 from rag_pipeline import RAGPipeline
 from hf_rag_pipeline import HuggingFaceRAGPipeline
+from query_export import QueryExporter
 import tempfile
 import os
 import logging
+import time
 
 
 # Configure logging
@@ -32,6 +34,9 @@ hf_rag = None
 openai_available = False
 hf_available = False
 current_rag = None
+
+# Initialize query exporter
+query_exporter = QueryExporter()
 
 # Try to initialize OpenAI pipeline first
 try:
@@ -86,6 +91,20 @@ class SearchResponse(BaseModel):
     results: List[dict]
     query: str
     total_results: int
+
+class ExportRequest(BaseModel):
+    query: str
+    search_results: List[dict]
+    ai_answer: Optional[str] = None
+    collection_name: Optional[str] = None
+    chunking_config: Optional[dict] = None
+    search_params: Optional[dict] = None
+    user_notes: Optional[str] = ""
+    model_used: Optional[str] = None
+    response_time_ms: Optional[int] = None
+
+class ComparisonRequest(BaseModel):
+    export_ids: List[str]
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -222,6 +241,8 @@ async def query_documents(query_request: QueryRequest):
         raise HTTPException(status_code=503, detail="No RAG pipelines available - query functionality disabled")
 
     try:
+        start_time = time.time()
+
         # Select pipeline based on request
         if query_request.pipeline == "huggingface" and hf_available:
             selected_rag = hf_rag
@@ -234,11 +255,32 @@ async def query_documents(query_request: QueryRequest):
         if not selected_rag:
             raise HTTPException(status_code=503, detail="Requested pipeline not available")
 
+        # Get collection info for export metadata
+        collection_info = selected_rag.get_collection_info(query_request.collection_name)
+
+        # Perform the query
         result = selected_rag.query(
             question=query_request.question,
             n_results=query_request.max_results,
             collection_name=query_request.collection_name
         )
+
+        # Calculate response time
+        end_time = time.time()
+        response_time_ms = int((end_time - start_time) * 1000)
+
+        # Add export metadata to result
+        result["export_metadata"] = {
+            "collection_info": collection_info,
+            "search_params": {
+                "max_results": query_request.max_results,
+                "pipeline_used": query_request.pipeline,
+                "collection_name": query_request.collection_name
+            },
+            "response_time_ms": response_time_ms,
+            "timestamp": time.time()
+        }
+
         return result
 
     except Exception as e:
@@ -250,12 +292,21 @@ async def search_documents(search_request: SearchRequest):
         raise HTTPException(status_code=503, detail="No RAG pipelines available - search functionality disabled")
 
     try:
+        start_time = time.time()
+
+        # Get collection info for export metadata
+        collection_info = current_rag.get_collection_info(search_request.collection_name)
+
         # Use current_rag for searching (both pipelines use same vector store)
         search_results = current_rag.search_documents(
             query=search_request.question,
             n_results=search_request.max_results,
             collection_name=search_request.collection_name
         )
+
+        # Calculate response time
+        end_time = time.time()
+        response_time_ms = int((end_time - start_time) * 1000)
 
         # Format results for response
         formatted_results = [
@@ -273,11 +324,26 @@ async def search_documents(search_request: SearchRequest):
             for result in search_results
         ]
 
-        return SearchResponse(
+        # Create response with export metadata
+        response = SearchResponse(
             results=formatted_results,
             query=search_request.question,
             total_results=len(formatted_results)
         )
+
+        # Add export metadata (convert to dict to add extra fields)
+        response_dict = response.dict()
+        response_dict["export_metadata"] = {
+            "collection_info": collection_info,
+            "search_params": {
+                "max_results": search_request.max_results,
+                "collection_name": search_request.collection_name
+            },
+            "response_time_ms": response_time_ms,
+            "timestamp": time.time()
+        }
+
+        return response_dict
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing search: {str(e)}")
@@ -410,6 +476,93 @@ async def get_collection_info(collection_name: str):
         return info
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting collection info: {str(e)}")
+
+@app.post("/export-query")
+async def export_query_results(export_request: ExportRequest):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        # Get collection info and chunking config
+        collection_info = current_rag.get_collection_info(export_request.collection_name)
+
+        # Build chunking config from request or defaults
+        chunking_config = export_request.chunking_config or {
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "text_splitter": "RecursiveCharacterTextSplitter"
+        }
+
+        # Export the query results
+        file_path = query_exporter.export_query_results(
+            query=export_request.query,
+            search_results=export_request.search_results,
+            ai_answer=export_request.ai_answer,
+            collection_info=collection_info,
+            chunking_config=chunking_config,
+            search_params=export_request.search_params,
+            user_notes=export_request.user_notes,
+            response_time_ms=export_request.response_time_ms,
+            model_used=export_request.model_used
+        )
+
+        return {
+            "message": "Query results exported successfully",
+            "file_path": file_path,
+            "export_id": file_path.split("_")[-1].replace(".json", "")
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exporting query results: {str(e)}")
+
+@app.get("/exports")
+async def list_exports(limit: int = 50):
+    try:
+        exports = query_exporter.list_exports(limit)
+        return {"exports": exports}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing exports: {str(e)}")
+
+@app.get("/exports/{export_id}")
+async def get_export(export_id: str):
+    try:
+        export_data = query_exporter.load_export(export_id)
+        if not export_data:
+            raise HTTPException(status_code=404, detail="Export not found")
+        return export_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading export: {str(e)}")
+
+@app.delete("/exports/{export_id}")
+async def delete_export(export_id: str):
+    try:
+        success = query_exporter.delete_export(export_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Export not found")
+        return {"message": "Export deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting export: {str(e)}")
+
+@app.post("/exports/compare")
+async def compare_exports(comparison_request: ComparisonRequest):
+    try:
+        if len(comparison_request.export_ids) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 export IDs for comparison")
+
+        comparison = query_exporter.generate_comparison_report(comparison_request.export_ids)
+
+        if "error" in comparison:
+            raise HTTPException(status_code=400, detail=comparison["error"])
+
+        return comparison
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error comparing exports: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

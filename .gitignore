@@ -216,3 +216,7 @@ chroma_db/**
 # File storage
 
 document_storage/**
+
+# Query exports
+
+query_exports/**
