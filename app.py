@@ -75,6 +75,7 @@ class SearchRequest(BaseModel):
 
 class CollectionRequest(BaseModel):
     collection_name: str
+    embedding_model: Optional[str] = None
 
 class QueryResponse(BaseModel):
     answer: str
@@ -352,11 +353,12 @@ async def create_collection(collection_request: CollectionRequest):
         raise HTTPException(status_code=503, detail="No RAG pipeline available")
 
     try:
-        success = current_rag.create_collection(collection_request.collection_name)
+        success = current_rag.create_collection(collection_request.collection_name, collection_request.embedding_model)
         if success:
             return {
                 "message": f"Collection '{collection_request.collection_name}' created successfully",
-                "collection_name": collection_request.collection_name
+                "collection_name": collection_request.collection_name,
+                "embedding_model": collection_request.embedding_model
             }
         else:
             raise HTTPException(status_code=400, detail=f"Collection '{collection_request.collection_name}' already exists")
@@ -386,6 +388,28 @@ async def get_pipeline_info():
         "current_default": current_default,
         "pipelines_available": pipelines_available
     }
+
+@app.get("/embedding-models")
+async def get_embedding_models():
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        models = current_rag.get_available_embedding_models()
+        return {"embedding_models": models}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting embedding models: {str(e)}")
+
+@app.get("/collections/{collection_name}/info")
+async def get_collection_info(collection_name: str):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        info = current_rag.get_collection_info(collection_name)
+        return info
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting collection info: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -5,6 +5,8 @@ import chromadb
 from chromadb.config import Settings
 from sentence_transformers import SentenceTransformer
 from document_storage import DocumentStorage
+import json
+import os
 
 
 class VectorStore:
@@ -14,7 +16,25 @@ class VectorStore:
             settings=Settings(anonymized_telemetry=False)
         )
 
-        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        # Initialize available embedding models
+        self.available_models = {
+            "all-MiniLM-L6-v2": {
+                "model": None,
+                "name": "MiniLM (Default)",
+                "description": "All-MiniLM-L6-v2 - Fast and efficient"
+            },
+            "google/embeddinggemma-300m": {
+                "model": None,
+                "name": "EmbeddingGemma",
+                "description": "Google EmbeddingGemma-300m - High quality embeddings"
+            }
+        }
+
+        # Cache for loaded embedding models
+        self._embedding_models = {}
+
+        # Default embedding model
+        self.default_embedding_model = "all-MiniLM-L6-v2"
         self.default_collection_name = "documents"
 
         # Initialize document storage
@@ -23,20 +43,89 @@ class VectorStore:
         # Cache for collections to avoid repeated lookups
         self._collections = {}
 
+        # Collection metadata file to store embedding model info
+        self.collection_metadata_file = os.path.join(persist_directory, "collection_metadata.json")
+        self._collection_metadata = self._load_collection_metadata()
+
         # Ensure default collection exists
         self._get_or_create_collection(self.default_collection_name)
 
-    def _get_or_create_collection(self, collection_name: str):
+    def _load_collection_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Load collection metadata from file"""
+        if os.path.exists(self.collection_metadata_file):
+            try:
+                with open(self.collection_metadata_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading collection metadata: {e}")
+        return {}
+
+    def _save_collection_metadata(self):
+        """Save collection metadata to file"""
+        try:
+            with open(self.collection_metadata_file, 'w') as f:
+                json.dump(self._collection_metadata, f, indent=2)
+        except Exception as e:
+            print(f"Error saving collection metadata: {e}")
+
+    def _get_embedding_model(self, model_name: str) -> SentenceTransformer:
+        """Get or load an embedding model"""
+        if model_name not in self._embedding_models:
+            print(f"Loading embedding model: {model_name}")
+            try:
+                self._embedding_models[model_name] = SentenceTransformer(model_name)
+            except Exception as e:
+                print(f"Error loading model {model_name}: {e}")
+                # Fallback to default model
+                if model_name != self.default_embedding_model:
+                    print(f"Falling back to default model: {self.default_embedding_model}")
+                    return self._get_embedding_model(self.default_embedding_model)
+                raise
+        return self._embedding_models[model_name]
+
+    def _get_collection_embedding_model(self, collection_name: str) -> str:
+        """Get the embedding model used by a collection"""
+        return self._collection_metadata.get(collection_name, {}).get("embedding_model", self.default_embedding_model)
+
+    def _format_query_for_model(self, query: str, model_name: str) -> str:
+        """Format query with model-specific prompt template"""
+        if model_name == "google/embeddinggemma-300m":
+            return f"task: search result | query: {query}"
+        return query
+
+    def _format_document_for_model(self, document: str, model_name: str, title: str = None) -> str:
+        """Format document with model-specific prompt template"""
+        if model_name == "google/embeddinggemma-300m":
+            title_part = title if title else "none"
+            return f"title: {title_part} | text: {document}"
+        return document
+
+    def _get_or_create_collection(self, collection_name: str, embedding_model: str = None):
         """Get or create a collection and cache it"""
         if collection_name in self._collections:
             return self._collections[collection_name]
+
+        # Set default embedding model for collection if not specified
+        if embedding_model is None:
+            embedding_model = self._get_collection_embedding_model(collection_name)
+
+        # Store/update collection metadata
+        if collection_name not in self._collection_metadata:
+            self._collection_metadata[collection_name] = {
+                "embedding_model": embedding_model,
+                "created_at": str(uuid.uuid4())  # Timestamp placeholder
+            }
+            self._save_collection_metadata()
 
         try:
             collection = self.client.get_collection(collection_name)
         except:
             collection = self.client.create_collection(
                 name=collection_name,
-                metadata={"description": "XML, JSON, and text documents with metadata"}
+                metadata={
+                    "description": "XML, JSON, and text documents with metadata",
+                    "embedding_model": embedding_model
+                }
             )
 
         self._collections[collection_name] = collection
@@ -46,8 +135,11 @@ class VectorStore:
         """List all available collections from document storage"""
         return self.document_storage.list_collections()
 
-    def create_collection(self, collection_name: str) -> bool:
+    def create_collection(self, collection_name: str, embedding_model: str = None) -> bool:
         """Create a new collection in both vector DB and document storage"""
+        if embedding_model is None:
+            embedding_model = self.default_embedding_model
+
         try:
             # Create in document storage first
             storage_success = self.document_storage.create_collection(collection_name)
@@ -56,13 +148,30 @@ class VectorStore:
 
             # Create in vector database
             if collection_name in [col.name for col in self.client.list_collections()]:
-                return True  # Vector collection already exists, storage creation succeeded
+                # Update metadata for existing collection
+                self._collection_metadata[collection_name] = {
+                    "embedding_model": embedding_model,
+                    "created_at": str(uuid.uuid4())
+                }
+                self._save_collection_metadata()
+                return True
 
             collection = self.client.create_collection(
                 name=collection_name,
-                metadata={"description": "XML, JSON, and text documents with metadata"}
+                metadata={
+                    "description": "XML, JSON, and text documents with metadata",
+                    "embedding_model": embedding_model
+                }
             )
             self._collections[collection_name] = collection
+
+            # Store collection metadata
+            self._collection_metadata[collection_name] = {
+                "embedding_model": embedding_model,
+                "created_at": str(uuid.uuid4())
+            }
+            self._save_collection_metadata()
+
             return True
         except Exception as e:
             print(f"Error creating collection {collection_name}: {e}")
@@ -114,7 +223,21 @@ class VectorStore:
             # Store chunk text for search, but full content is in filesystem
             chunk_documents.append(chunk)
 
-        chunk_embeddings = self.embedding_model.encode(chunk_documents).tolist()
+        # Get the embedding model for this collection
+        embedding_model_name = self._get_collection_embedding_model(collection_name)
+        embedding_model = self._get_embedding_model(embedding_model_name)
+
+        # Format documents for the specific embedding model
+        formatted_chunks = []
+        for chunk in chunk_documents:
+            formatted_chunk = self._format_document_for_model(
+                chunk,
+                embedding_model_name,
+                title=metadata.get("title") or metadata.get("filename")
+            )
+            formatted_chunks.append(formatted_chunk)
+
+        chunk_embeddings = embedding_model.encode(formatted_chunks).tolist()
 
         collection.add(
             embeddings=chunk_embeddings,
@@ -130,7 +253,14 @@ class VectorStore:
             collection_name = self.default_collection_name
 
         collection = self._get_or_create_collection(collection_name)
-        query_embedding = self.embedding_model.encode([query]).tolist()
+
+        # Get the embedding model for this collection
+        embedding_model_name = self._get_collection_embedding_model(collection_name)
+        embedding_model = self._get_embedding_model(embedding_model_name)
+
+        # Format query for the specific embedding model
+        formatted_query = self._format_query_for_model(query, embedding_model_name)
+        query_embedding = embedding_model.encode([formatted_query]).tolist()
 
         results = collection.query(
             query_embeddings=query_embedding,
@@ -149,6 +279,31 @@ class VectorStore:
             })
 
         return formatted_results
+
+    def get_available_embedding_models(self) -> Dict[str, Dict[str, str]]:
+        """Get list of available embedding models"""
+        return {
+            model_id: {
+                "name": info["name"],
+                "description": info["description"]
+            }
+            for model_id, info in self.available_models.items()
+        }
+
+    def get_collection_info(self, collection_name: str = None) -> Dict[str, Any]:
+        """Get collection information including embedding model"""
+        if collection_name is None:
+            collection_name = self.default_collection_name
+
+        embedding_model = self._get_collection_embedding_model(collection_name)
+        model_info = self.available_models.get(embedding_model, {})
+
+        return {
+            "collection_name": collection_name,
+            "embedding_model": embedding_model,
+            "embedding_model_name": model_info.get("name", embedding_model),
+            "embedding_model_description": model_info.get("description", "Unknown model")
+        }
 
     def delete_document(self, document_id: str, collection_name: str = None):
         if collection_name is None:

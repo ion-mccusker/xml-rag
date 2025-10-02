@@ -510,9 +510,18 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <input type="text" id="newCollectionName" placeholder="New collection name" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <select id="embeddingModelSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <option value="">Default Model</option>
+                    </select>
                     <button onclick="createNewCollection()" style="padding: 8px 12px; font-size: 12px; background-color: #17a2b8; border: none; color: white; border-radius: 5px; cursor: pointer;">Create New</button>
                 </div>
                 <button onclick="refreshCollections()" style="padding: 8px 12px; font-size: 12px; background-color: #6c757d; border: none; color: white; border-radius: 5px; cursor: pointer;">Refresh</button>
+            </div>
+
+            <!-- Collection Info -->
+            <div id="collectionInfo" style="margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-size: 13px; color: #495057; display: none;">
+                <strong>📊 Collection Info:</strong>
+                <span id="collectionInfoText">Loading...</span>
             </div>
 
             <!-- Chunk Configuration -->
@@ -1773,6 +1782,58 @@
             }
         }
 
+        // Embedding model management functions
+        async function loadEmbeddingModels() {
+            try {
+                const response = await fetch('/embedding-models');
+                const result = await response.json();
+
+                if (response.ok) {
+                    const embeddingModelSelect = document.getElementById('embeddingModelSelect');
+
+                    // Clear existing options except default
+                    embeddingModelSelect.innerHTML = '<option value="">Default Model</option>';
+
+                    // Add available models
+                    Object.entries(result.embedding_models).forEach(([modelId, modelInfo]) => {
+                        const option = document.createElement('option');
+                        option.value = modelId;
+                        option.textContent = `${modelInfo.name} - ${modelInfo.description}`;
+                        embeddingModelSelect.appendChild(option);
+                    });
+                } else {
+                    console.error('Failed to load embedding models:', result.detail);
+                }
+            } catch (error) {
+                console.error('Error loading embedding models:', error);
+            }
+        }
+
+        async function showCollectionInfo(collectionName) {
+            if (!collectionName || collectionName === '') {
+                document.getElementById('collectionInfo').style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/collections/${collectionName}/info`);
+                const result = await response.json();
+
+                if (response.ok) {
+                    const infoDiv = document.getElementById('collectionInfo');
+                    const infoText = document.getElementById('collectionInfoText');
+
+                    infoText.innerHTML = `<strong>${result.collection_name}</strong> uses <em>${result.embedding_model_name}</em> (${result.embedding_model_description})`;
+                    infoDiv.style.display = 'block';
+                } else {
+                    document.getElementById('collectionInfo').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading collection info:', error);
+                document.getElementById('collectionInfo').style.display = 'none';
+            }
+        }
+
         // Collection management functions
         async function loadCollections() {
             try {
@@ -1818,9 +1879,28 @@
             }
         }
 
+        function setupCollectionEventListeners() {
+            // Add event listener for collection selection change
+            document.getElementById('collectionSelect').addEventListener('change', function() {
+                showCollectionInfo(this.value);
+            });
+
+            // Add event listener for query collection selection change
+            const queryCollectionSelect = document.getElementById('queryCollectionSelect');
+            if (queryCollectionSelect) {
+                queryCollectionSelect.addEventListener('change', function() {
+                    if (this.value) {
+                        showCollectionInfo(this.value);
+                    }
+                });
+            }
+        }
+
         async function createNewCollection() {
             const newCollectionInput = document.getElementById('newCollectionName');
+            const embeddingModelSelect = document.getElementById('embeddingModelSelect');
             const collectionName = newCollectionInput.value.trim();
+            const embeddingModel = embeddingModelSelect.value || null;
 
             if (!collectionName) {
                 alert('Please enter a collection name.');
@@ -1834,14 +1914,19 @@
             }
 
             try {
+                const requestBody = {
+                    collection_name: collectionName
+                };
+                if (embeddingModel) {
+                    requestBody.embedding_model = embeddingModel;
+                }
+
                 const response = await fetch('/collections', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        collection_name: collectionName
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
                 const result = await response.json();
@@ -1849,11 +1934,13 @@
                 if (response.ok) {
                     showStatus(`Collection "${collectionName}" created successfully!`, 'success');
                     newCollectionInput.value = '';
+                    embeddingModelSelect.value = '';
                     await loadCollections();
                     updateTotalDocumentCount();
 
-                    // Select the new collection
+                    // Select the new collection and show its info
                     document.getElementById('collectionSelect').value = collectionName;
+                    showCollectionInfo(collectionName);
                 } else {
                     showStatus(`Error creating collection: ${result.detail}`, 'error');
                 }
@@ -1912,7 +1999,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadDocuments(1, '', '', '');
             loadCollections();
+            loadEmbeddingModels();
+            setupCollectionEventListeners();
             updateTotalDocumentCount();
+
+            // Show info for default collection
+            showCollectionInfo('documents');
         });
     </script>
 </body>
