@@ -606,6 +606,16 @@
                         <option value="documents">documents (default)</option>
                     </select>
                 </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="resultCountSelect" style="margin-bottom: 5px; font-weight: bold;">Results Count:</label>
+                    <select id="resultCountSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 100px;">
+                        <option value="3">3 results</option>
+                        <option value="5" selected>5 results</option>
+                        <option value="10">10 results</option>
+                        <option value="15">15 results</option>
+                        <option value="20">20 results</option>
+                    </select>
+                </div>
             </div>
             <input type="text" id="queryInput" class="query-input" placeholder="Ask a question about your documents..." />
             <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
@@ -1072,7 +1082,7 @@
                     },
                     body: JSON.stringify({
                         question: question,
-                        max_results: 5,
+                        max_results: parseInt(document.getElementById('resultCountSelect').value),
                         pipeline: pipelineSelect.value,
                         collection_name: document.getElementById('queryCollectionSelect').value
                     })
@@ -1125,7 +1135,7 @@
                     },
                     body: JSON.stringify({
                         question: question,
-                        max_results: 5,
+                        max_results: parseInt(document.getElementById('resultCountSelect').value),
                         collection_name: document.getElementById('queryCollectionSelect').value
                     })
                 });
