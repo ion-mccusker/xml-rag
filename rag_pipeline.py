@@ -104,21 +104,7 @@ Please provide a comprehensive answer based on the context above."""
 
         return {
             "answer": answer,
-            "sources": [
-                {
-                    "filename": result["metadata"].get("filename", "unknown"),
-                    "document_type": result["metadata"].get("document_type", "unknown"),
-                    "chunk_index": result["metadata"].get("chunk_index", 0),
-                    "distance": result["distance"],
-                    "relevance_score": round(1 - (result["distance"] / 2), 3),
-                    "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
-                    "full_content": result["document"],
-                    "content": result["document"],
-                    "document_id": result["metadata"].get("document_id", ""),
-                    "metadata": result["metadata"]
-                }
-                for result in search_results
-            ],
+            "sources": self._format_sources(search_results, collection_name),
             "query": question,
             "retrieved_chunks": search_results
         }
@@ -156,3 +142,37 @@ Please provide a comprehensive answer based on the context above."""
 
     def get_collection_info(self, collection_name: str = None) -> Dict[str, Any]:
         return self.vector_store.get_collection_info(collection_name)
+
+    def _format_sources(self, search_results: List[Dict[str, Any]], collection_name: str) -> List[Dict[str, Any]]:
+        """Format search results with all available metadata fields"""
+        formatted_sources = []
+        for result in search_results:
+            formatted_source = {
+                "filename": result["metadata"].get("filename", "unknown"),
+                "document_type": result["metadata"].get("document_type", "unknown"),
+                "chunk_index": result["metadata"].get("chunk_index", 0),
+                "distance": result["distance"],
+                "relevance_score": round(1 - (result["distance"] / 2), 3),
+                "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
+                "full_content": result["document"],
+                "content": result["document"],
+                "document_id": result["metadata"].get("document_id", ""),
+                "collection_name": result["metadata"].get("collection_name", collection_name),
+                "chunk_length": result["metadata"].get("chunk_length", len(result["document"])),
+                "metadata": result["metadata"]
+            }
+
+            # Add all available metadata fields to top level for easy access
+            # Exclude core search result fields to avoid conflicts
+            core_result_fields = {
+                "filename", "document_type", "chunk_index", "distance", "relevance_score",
+                "content_preview", "full_content", "content", "document_id", "collection_name", "chunk_length", "metadata"
+            }
+
+            for field, value in result["metadata"].items():
+                if field not in core_result_fields:
+                    formatted_source[field] = value
+
+            formatted_sources.append(formatted_source)
+
+        return formatted_sources

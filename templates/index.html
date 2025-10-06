@@ -1288,12 +1288,16 @@
                 Chunk ${chunk.chunk_index} from ${chunk.filename}
             `;
 
+            // For search results, metadata is mixed with chunk data, so we need to extract it
+            // Create a metadata object from the chunk data
+            const metadata = chunk.metadata || chunk;  // Use chunk.metadata if available, otherwise use chunk itself
+
             // Format metadata for display
-            modalMetadata.innerHTML = formatMetadata(chunk.metadata || {}, docType, chunk);
+            modalMetadata.innerHTML = formatMetadata(metadata, docType, chunk);
 
             // Update metadata summary
             const summary = document.getElementById('chunkMetadataSummary');
-            summary.textContent = generateMetadataSummary(chunk.metadata || {}, docType);
+            summary.textContent = generateMetadataSummary(metadata, docType);
 
             modalContent.textContent = chunk.content;
             modal.style.display = 'block';
@@ -1489,12 +1493,19 @@
                     html += createMetadataItem('Has Nested Metadata', metadata.has_nested_metadata ? 'Yes' : 'No');
                 }
 
-                // Display nested metadata fields (prefixed with meta_)
+                // Display custom metadata fields from JSON documents
+                const coreFields = new Set([
+                    'filename', 'document_type', 'chunk_index', 'document_id', 'collection_name', 'chunk_length',
+                    'data_type', 'total_keys', 'total_items', 'max_depth', 'structure_summary', 'format_type',
+                    'content_length', 'has_nested_metadata', 'title', 'name', 'description', 'author', 'date',
+                    'created', 'modified', 'version', 'id'
+                ]);
+
                 Object.keys(metadata).forEach(key => {
-                    if (key.startsWith('meta_')) {
-                        const displayKey = key.replace('meta_', '').replace(/_/g, ' ');
+                    if (!coreFields.has(key) && metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '') {
+                        const displayKey = key.replace(/_/g, ' ');
                         const capitalizedKey = displayKey.charAt(0).toUpperCase() + displayKey.slice(1);
-                        html += createMetadataItem(`Meta ${capitalizedKey}`, metadata[key]);
+                        html += createMetadataItem(capitalizedKey, metadata[key]);
                     }
                 });
 

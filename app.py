@@ -317,8 +317,9 @@ async def search_documents(search_request: SearchRequest):
         response_time_ms = int((end_time - start_time) * 1000)
 
         # Format results for response
-        formatted_results = [
-            {
+        formatted_results = []
+        for result in search_results:
+            formatted_result = {
                 "filename": result["metadata"].get("filename", "unknown"),
                 "document_type": result["metadata"].get("document_type", "unknown"),
                 "chunk_index": result["metadata"].get("chunk_index", 0),
@@ -327,10 +328,23 @@ async def search_documents(search_request: SearchRequest):
                 "content": result["document"],
                 "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
                 "document_id": result["metadata"].get("document_id", ""),
+                "collection_name": result["metadata"].get("collection_name", search_request.collection_name),
+                "chunk_length": result["metadata"].get("chunk_length", len(result["document"])),
                 "metadata": result["metadata"]
             }
-            for result in search_results
-        ]
+
+            # Add all available metadata fields to top level for easy access
+            # Exclude core search result fields to avoid conflicts
+            core_result_fields = {
+                "filename", "document_type", "chunk_index", "distance", "relevance_score",
+                "content", "content_preview", "document_id", "collection_name", "chunk_length", "metadata"
+            }
+
+            for field, value in result["metadata"].items():
+                if field not in core_result_fields:
+                    formatted_result[field] = value
+
+            formatted_results.append(formatted_result)
 
         # Create response with export metadata
         response = SearchResponse(

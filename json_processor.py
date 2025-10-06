@@ -253,12 +253,12 @@ class JSONProcessor:
             "has_nested_metadata": bool(doc_metadata)
         }
 
-        # Add nested metadata fields (convert complex types to strings)
+        # Add nested metadata fields directly (preserve original field names)
         for key, value in doc_metadata.items():
             if isinstance(value, (str, int, float, bool)) and value is not None:
-                metadata[f"meta_{key}"] = str(value)
+                metadata[key] = value if isinstance(value, (str, int, float)) else str(value)
             elif isinstance(value, (list, dict)):
-                metadata[f"meta_{key}"] = str(value)
+                metadata[key] = str(value)  # Convert complex types to strings
 
         # Create text chunks from the content using LangChain's text splitter
         text_chunks = []

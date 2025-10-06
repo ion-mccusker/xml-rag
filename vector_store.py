@@ -215,7 +215,7 @@ class VectorStore:
             chunk_id = f"{doc_id}_chunk_{i}"
             chunk_ids.append(chunk_id)
 
-            # Minimal metadata for vector search - no full content
+            # Chunk metadata with document-specific fields preserved
             chunk_metadata = {
                 "chunk_index": i,
                 "document_id": doc_id,
@@ -224,6 +224,16 @@ class VectorStore:
                 "document_type": metadata.get("document_type", "unknown"),
                 "collection_name": collection_name
             }
+
+            # Preserve all document metadata fields except system/core fields
+            core_fields = {
+                "chunk_index", "document_id", "chunk_length", "filename",
+                "document_type", "collection_name"
+            }
+
+            for field, value in metadata.items():
+                if field not in core_fields:
+                    chunk_metadata[field] = value
 
             chunk_metadatas.append(chunk_metadata)
             # Store chunk text for search, but full content is in filesystem
