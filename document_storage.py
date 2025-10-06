@@ -276,6 +276,24 @@ class DocumentStorage:
         self._ensure_collection_exists(collection_name)
         return True
 
+    def delete_collection(self, collection_name: str) -> bool:
+        """Delete a collection and all its data"""
+        if collection_name == "documents":
+            raise ValueError("Cannot delete the default collection")
+
+        collection_dir = self.collections_dir / collection_name
+        if not collection_dir.exists():
+            return False
+
+        try:
+            # Delete the entire collection directory
+            import shutil
+            shutil.rmtree(collection_dir)
+            return True
+        except Exception as e:
+            print(f"Error deleting collection directory {collection_dir}: {e}")
+            return False
+
     def get_collection_stats(self, collection_name: str) -> Dict[str, Any]:
         """Get statistics for a collection"""
         if collection_name not in self.list_collections():

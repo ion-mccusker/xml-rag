@@ -148,6 +148,9 @@ Please provide a comprehensive answer based on the context above."""
     def create_collection(self, collection_name: str, embedding_model: str = None) -> bool:
         return self.vector_store.create_collection(collection_name, embedding_model)
 
+    def delete_collection(self, collection_name: str) -> bool:
+        return self.vector_store.delete_collection(collection_name)
+
     def get_available_embedding_models(self) -> Dict[str, Dict[str, str]]:
         return self.vector_store.get_available_embedding_models()
 

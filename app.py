@@ -466,7 +466,7 @@ async def get_embedding_models():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting embedding models: {str(e)}")
 
-@app.get("/collections/{collection_name}/info")
+@app.get("/collections/{collection_name}")
 async def get_collection_info(collection_name: str):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available")
@@ -476,6 +476,11 @@ async def get_collection_info(collection_name: str):
         return info
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error getting collection info: {str(e)}")
+
+@app.get("/collections/{collection_name}/info")
+async def get_collection_info_legacy(collection_name: str):
+    """Legacy endpoint for backward compatibility"""
+    return await get_collection_info(collection_name)
 
 @app.post("/export-query")
 async def export_query_results(export_request: ExportRequest):
@@ -563,6 +568,22 @@ async def compare_exports(comparison_request: ComparisonRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error comparing exports: {str(e)}")
+
+@app.delete("/collections/{collection_name}")
+async def delete_collection(collection_name: str):
+    if not current_rag:
+        raise HTTPException(status_code=503, detail="No RAG pipeline available")
+
+    try:
+        success = current_rag.delete_collection(collection_name)
+        if success:
+            return {"message": f"Collection '{collection_name}' deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail=f"Collection '{collection_name}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting collection: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

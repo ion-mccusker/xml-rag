@@ -305,6 +305,30 @@ class VectorStore:
             "embedding_model_description": model_info.get("description", "Unknown model")
         }
 
+    def delete_collection(self, collection_name: str) -> bool:
+        """Delete a collection and all its data"""
+        if collection_name == self.default_collection_name:
+            raise ValueError("Cannot delete the default collection")
+
+        try:
+            # Delete from ChromaDB
+            self.client.delete_collection(collection_name)
+
+            # Delete all documents from filesystem storage for this collection
+            self.document_storage.delete_collection(collection_name)
+
+            # Remove from collection metadata and cache
+            if collection_name in self._collection_metadata:
+                del self._collection_metadata[collection_name]
+
+            if collection_name in self._collections:
+                del self._collections[collection_name]
+
+            return True
+        except Exception as e:
+            print(f"Error deleting collection {collection_name}: {e}")
+            return False
+
     def delete_document(self, document_id: str, collection_name: str = None):
         if collection_name is None:
             collection_name = self.default_collection_name

@@ -499,6 +499,52 @@
             <p><strong>Documents in database: <span id="totalDocumentCount">{{ document_count }}</span></strong></p>
         </div>
 
+        <!-- Collections Management -->
+        <div class="section">
+            <h3>📂 Collections Management</h3>
+
+            <!-- Create New Collection Form -->
+            <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 15px 0; color: #495057; font-size: 16px;">➕ Create New Collection</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
+                    <div>
+                        <label for="newCollectionName" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Collection Name:</label>
+                        <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                        <small style="color: #666; font-size: 12px;">Letters, numbers, hyphens, and underscores only</small>
+                    </div>
+                    <div>
+                        <label for="embeddingModelSelect" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Embedding Model:</label>
+                        <select id="embeddingModelSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            <option value="">Default Model</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Default Chunking:</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Size">
+                            <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Overlap">
+                        </div>
+                        <small style="color: #666; font-size: 11px;">Size / Overlap</small>
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button onclick="createNewCollection()" style="padding: 10px 20px; font-size: 14px; background-color: #28a745; border: none; color: white; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                        ➕ Create Collection
+                    </button>
+                </div>
+            </div>
+
+            <!-- Existing Collections List -->
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">📋 Existing Collections</h4>
+                <div id="collectionsListContainer" style="background-color: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto;">
+                    <div id="collectionsList" style="padding: 10px;">
+                        Loading collections...
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="section">
             <h3>Upload Documents</h3>
             <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
@@ -508,14 +554,6 @@
                         <option value="documents">documents (default)</option>
                     </select>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <input type="text" id="newCollectionName" placeholder="New collection name" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                    <select id="embeddingModelSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                        <option value="">Default Model</option>
-                    </select>
-                    <button onclick="createNewCollection()" style="padding: 8px 12px; font-size: 12px; background-color: #17a2b8; border: none; color: white; border-radius: 5px; cursor: pointer;">Create New</button>
-                </div>
-                <button onclick="refreshCollections()" style="padding: 8px 12px; font-size: 12px; background-color: #6c757d; border: none; color: white; border-radius: 5px; cursor: pointer;">Refresh</button>
             </div>
 
             <!-- Collection Info -->
@@ -1954,8 +1992,13 @@
         async function createNewCollection() {
             const newCollectionInput = document.getElementById('newCollectionName');
             const embeddingModelSelect = document.getElementById('embeddingModelSelect');
+            const chunkSizeInput = document.getElementById('newCollectionChunkSize');
+            const chunkOverlapInput = document.getElementById('newCollectionChunkOverlap');
+
             const collectionName = newCollectionInput.value.trim();
             const embeddingModel = embeddingModelSelect.value || null;
+            const chunkSize = parseInt(chunkSizeInput.value) || 1000;
+            const chunkOverlap = parseInt(chunkOverlapInput.value) || 200;
 
             if (!collectionName) {
                 alert('Please enter a collection name.');
@@ -1967,6 +2010,18 @@
                 alert('Collection name can only contain letters, numbers, hyphens, and underscores.');
                 return;
             }
+
+            // Validate chunk configuration
+            if (chunkOverlap >= chunkSize) {
+                alert('⚠️ Chunk overlap must be smaller than chunk size!');
+                chunkOverlapInput.style.borderColor = '#dc3545';
+                chunkSizeInput.style.borderColor = '#dc3545';
+                return;
+            }
+
+            // Reset border colors
+            chunkOverlapInput.style.borderColor = '#ddd';
+            chunkSizeInput.style.borderColor = '#ddd';
 
             try {
                 const requestBody = {
@@ -1987,26 +2042,157 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    showStatus(`Collection "${collectionName}" created successfully!`, 'success');
+                    showStatus(`✅ Collection "${collectionName}" created successfully!`, 'success');
+
+                    // Clear the form
                     newCollectionInput.value = '';
                     embeddingModelSelect.value = '';
+                    chunkSizeInput.value = '1000';
+                    chunkOverlapInput.value = '200';
+
+                    // Refresh collections lists
                     await loadCollections();
+                    await loadCollectionsList();
                     updateTotalDocumentCount();
 
                     // Select the new collection and show its info
                     document.getElementById('collectionSelect').value = collectionName;
+                    document.getElementById('queryCollectionSelect').value = collectionName;
                     showCollectionInfo(collectionName);
                 } else {
-                    showStatus(`Error creating collection: ${result.detail}`, 'error');
+                    showStatus(`❌ Error creating collection: ${result.detail}`, 'error');
                 }
             } catch (error) {
-                showStatus(`Error creating collection: ${error.message}`, 'error');
+                showStatus(`❌ Error creating collection: ${error.message}`, 'error');
             }
         }
 
         async function refreshCollections() {
             await loadCollections();
+            await loadCollectionsList();
             showStatus('Collections refreshed!', 'success');
+        }
+
+        async function loadCollectionsList() {
+            try {
+                const response = await fetch('/collections');
+                const result = await response.json();
+
+                const collectionsListDiv = document.getElementById('collectionsList');
+
+                if (response.ok && result.collections) {
+                    if (result.collections.length === 0) {
+                        collectionsListDiv.innerHTML = '<div style="text-align: center; color: #666; padding: 20px;">No collections found</div>';
+                        return;
+                    }
+
+                    let html = '';
+                    for (const collection of result.collections) {
+                        const isDefault = collection === 'documents';
+                        const collectionInfo = await getCollectionInfo(collection);
+
+                        html += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; ${isDefault ? 'background-color: #f8f9fa;' : ''}">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: bold; color: #333; margin-bottom: 4px;">
+                                        ${collection} ${isDefault ? '<span style="color: #6c757d; font-size: 12px;">(default)</span>' : ''}
+                                    </div>
+                                    <div style="font-size: 12px; color: #666;">
+                                        Model: ${collectionInfo?.embedding_model_name || 'Unknown'} |
+                                        Documents: <span id="collection-count-${collection}">Loading...</span>
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button onclick="viewCollectionDetails('${collection}')"
+                                            style="padding: 6px 12px; font-size: 12px; background-color: #17a2b8; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                                        📊 Details
+                                    </button>
+                                    ${!isDefault ? `
+                                        <button onclick="deleteCollection('${collection}')"
+                                                style="padding: 6px 12px; font-size: 12px; background-color: #dc3545; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                                            🗑️ Delete
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    collectionsListDiv.innerHTML = html;
+
+                    // Load document counts for each collection
+                    for (const collection of result.collections) {
+                        loadCollectionDocumentCount(collection);
+                    }
+                } else {
+                    collectionsListDiv.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px;">Error loading collections</div>';
+                }
+            } catch (error) {
+                console.error('Error loading collections list:', error);
+                document.getElementById('collectionsList').innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px;">Error loading collections</div>';
+            }
+        }
+
+        async function getCollectionInfo(collectionName) {
+            try {
+                const response = await fetch(`/collections/${encodeURIComponent(collectionName)}`);
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (error) {
+                console.error(`Error getting info for collection ${collectionName}:`, error);
+            }
+            return null;
+        }
+
+        async function loadCollectionDocumentCount(collectionName) {
+            try {
+                const response = await fetch(`/documents?collection_name=${encodeURIComponent(collectionName)}&per_page=1`);
+                if (response.ok) {
+                    const result = await response.json();
+                    const countElement = document.getElementById(`collection-count-${collectionName}`);
+                    if (countElement) {
+                        countElement.textContent = result.total_count || 0;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error loading document count for ${collectionName}:`, error);
+            }
+        }
+
+        async function deleteCollection(collectionName) {
+            if (!confirm(`Are you sure you want to delete the collection "${collectionName}"?\n\nThis will permanently delete all documents and data in this collection. This action cannot be undone.`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/collections/${encodeURIComponent(collectionName)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showStatus(`✅ Collection "${collectionName}" deleted successfully!`, 'success');
+                    await loadCollections();
+                    await loadCollectionsList();
+                    updateTotalDocumentCount();
+                } else {
+                    showStatus(`❌ Error deleting collection: ${result.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`❌ Error deleting collection: ${error.message}`, 'error');
+            }
+        }
+
+        function viewCollectionDetails(collectionName) {
+            // Switch to the collection and show its info
+            document.getElementById('collectionSelect').value = collectionName;
+            document.getElementById('queryCollectionSelect').value = collectionName;
+            showCollectionInfo(collectionName);
+
+            // Scroll to the collection info section
+            document.getElementById('collectionInfo').scrollIntoView({ behavior: 'smooth' });
         }
 
         // Chunk configuration validation
@@ -2593,6 +2779,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadDocuments(1, '', '', '');
             loadCollections();
+            loadCollectionsList(); // Load the collections management list
             loadEmbeddingModels();
             setupCollectionEventListeners();
             updateTotalDocumentCount();
