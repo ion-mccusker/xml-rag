@@ -504,33 +504,39 @@
             <h3>📂 Collections Management</h3>
 
             <!-- Create New Collection Form -->
-            <div style="margin-bottom: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-                <h4 style="margin: 0 0 15px 0; color: #495057; font-size: 16px;">➕ Create New Collection</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end;">
-                    <div>
-                        <label for="newCollectionName" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Collection Name:</label>
-                        <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                        <small style="color: #666; font-size: 12px;">Letters, numbers, hyphens, and underscores only</small>
-                    </div>
-                    <div>
-                        <label for="embeddingModelSelect" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Embedding Model:</label>
-                        <select id="embeddingModelSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                            <option value="">Default Model</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Default Chunking:</label>
-                        <div style="display: flex; gap: 10px;">
-                            <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Size">
-                            <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Overlap">
-                        </div>
-                        <small style="color: #666; font-size: 11px;">Size / Overlap</small>
-                    </div>
+            <div style="margin-bottom: 20px; border: 1px solid #e9ecef; border-radius: 8px;">
+                <div onclick="toggleCreateCollectionForm()" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0; color: #495057; font-size: 16px;">➕ Create New Collection</h4>
+                    <span id="createCollectionToggle" style="font-size: 18px; color: #495057;">▼</span>
                 </div>
-                <div style="margin-top: 15px;">
-                    <button onclick="createNewCollection()" style="padding: 10px 20px; font-size: 14px; background-color: #28a745; border: none; color: white; border-radius: 5px; cursor: pointer; font-weight: bold;">
-                        ➕ Create Collection
-                    </button>
+                <div id="createCollectionForm" style="padding: 15px; background-color: white; border-radius: 0 0 8px 8px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; align-items: end; margin-bottom: 15px;">
+                        <div>
+                            <label for="newCollectionName" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Collection Name:</label>
+                            <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            <small style="color: #666; font-size: 12px;">Letters, numbers, hyphens, and underscores only</small>
+                        </div>
+                        <div>
+                            <label for="embeddingModelSelect" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Embedding Model:</label>
+                            <select id="embeddingModelSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                                <option value="">Default Model</option>
+                            </select>
+                            <small style="color: #666; font-size: 12px;">Select your embedding model</small>
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Default Chunking:</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Size">
+                                <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Overlap">
+                            </div>
+                            <small style="color: #666; font-size: 11px;">Size / Overlap</small>
+                        </div>
+                    </div>
+                    <div>
+                        <button onclick="createNewCollection()" style="padding: 10px 20px; font-size: 14px; background-color: #28a745; border: none; color: white; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                            ➕ Create Collection
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -562,28 +568,6 @@
                 <span id="collectionInfoText">Loading...</span>
             </div>
 
-            <!-- Chunk Configuration -->
-            <div style="margin-bottom: 15px; padding: 12px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef;">
-                <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 14px;">📝 Chunking Configuration</h4>
-                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <label for="chunkSize" style="font-weight: bold; color: #333; font-size: 13px;">Chunk Size:</label>
-                        <input type="number" id="chunkSize" value="1000" min="100" max="4000" step="100" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 80px;">
-                        <span style="color: #666; font-size: 12px;">chars</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <label for="chunkOverlap" style="font-weight: bold; color: #333; font-size: 13px;">Overlap:</label>
-                        <input type="number" id="chunkOverlap" value="200" min="0" max="1000" step="50" style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; width: 80px;">
-                        <span style="color: #666; font-size: 12px;">chars</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <button onclick="validateChunkConfig()" style="padding: 6px 12px; font-size: 12px; background-color: #28a745; border: none; color: white; border-radius: 4px; cursor: pointer;">✓ Validate</button>
-                    </div>
-                </div>
-                <div style="margin-top: 8px; font-size: 11px; color: #666;">
-                    💡 <strong>Tip:</strong> Larger chunks preserve more context but may be less precise. Overlap helps maintain continuity between chunks.
-                </div>
-            </div>
             <div class="upload-area">
                 <p>Select one or more XML, JSON, or text files to upload</p>
                 <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
@@ -857,10 +841,6 @@
                         formData.append('collection_name', collectionSelect.value);
                     }
 
-                    // Add chunk configuration
-                    const chunkConfig = getChunkConfig();
-                    formData.append('chunk_size', chunkConfig.chunk_size.toString());
-                    formData.append('chunk_overlap', chunkConfig.chunk_overlap.toString());
 
                     const response = await fetch('/upload', {
                         method: 'POST',
@@ -896,10 +876,6 @@
                             formData.append('collection_name', collectionSelect.value);
                         }
 
-                        // Add chunk configuration
-                        const chunkConfig = getChunkConfig();
-                        formData.append('chunk_size', chunkConfig.chunk_size.toString());
-                        formData.append('chunk_overlap', chunkConfig.chunk_overlap.toString());
 
                         try {
                             const response = await fetch('/upload', {
@@ -1916,7 +1892,8 @@
                     const infoDiv = document.getElementById('collectionInfo');
                     const infoText = document.getElementById('collectionInfoText');
 
-                    infoText.innerHTML = `<strong>${result.collection_name}</strong> uses <em>${result.embedding_model_name}</em> (${result.embedding_model_description})`;
+                    infoText.innerHTML = `<strong>${result.collection_name}</strong> uses <em>${result.embedding_model_name}</em> (${result.embedding_model_description})<br>
+                        <span style="font-size: 12px; color: #666;">Chunking: ${result.chunk_size || 1000} chars with ${result.chunk_overlap || 200} overlap</span>`;
                     infoDiv.style.display = 'block';
                 } else {
                     document.getElementById('collectionInfo').style.display = 'none';
@@ -2025,7 +2002,9 @@
 
             try {
                 const requestBody = {
-                    collection_name: collectionName
+                    collection_name: collectionName,
+                    chunk_size: chunkSize,
+                    chunk_overlap: chunkOverlap
                 };
                 if (embeddingModel) {
                     requestBody.embedding_model = embeddingModel;
@@ -2092,24 +2071,25 @@
                         const collectionInfo = await getCollectionInfo(collection);
 
                         html += `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; ${isDefault ? 'background-color: #f8f9fa;' : ''}">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; ${isDefault ? 'background-color: #f8f9fa;' : ''}">
                                 <div style="flex: 1;">
-                                    <div style="font-weight: bold; color: #333; margin-bottom: 4px;">
+                                    <div style="font-weight: bold; color: #333; margin-bottom: 6px; font-size: 14px;">
                                         ${collection} ${isDefault ? '<span style="color: #6c757d; font-size: 12px;">(default)</span>' : ''}
                                     </div>
-                                    <div style="font-size: 12px; color: #666;">
-                                        Model: ${collectionInfo?.embedding_model_name || 'Unknown'} |
-                                        Documents: <span id="collection-count-${collection}">Loading...</span>
+                                    <div style="font-size: 12px; color: #666; line-height: 1.4;">
+                                        <div style="margin-bottom: 2px;">
+                                            📊 <strong>Model:</strong> ${collectionInfo?.embedding_model_name || 'Unknown'}
+                                            | 📄 <strong>Documents:</strong> <span id="collection-count-${collection}">Loading...</span>
+                                        </div>
+                                        <div>
+                                            ⚙️ <strong>Chunking:</strong> ${collectionInfo?.chunk_size || 1000} chars with ${collectionInfo?.chunk_overlap || 200} overlap
+                                        </div>
                                     </div>
                                 </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <button onclick="viewCollectionDetails('${collection}')"
-                                            style="padding: 6px 12px; font-size: 12px; background-color: #17a2b8; border: none; color: white; border-radius: 4px; cursor: pointer;">
-                                        📊 Details
-                                    </button>
+                                <div style="display: flex; gap: 8px; align-items: center;">
                                     ${!isDefault ? `
                                         <button onclick="deleteCollection('${collection}')"
-                                                style="padding: 6px 12px; font-size: 12px; background-color: #dc3545; border: none; color: white; border-radius: 4px; cursor: pointer;">
+                                                style="padding: 8px 12px; font-size: 12px; background-color: #dc3545; border: none; color: white; border-radius: 4px; cursor: pointer;">
                                             🗑️ Delete
                                         </button>
                                     ` : ''}
@@ -2185,56 +2165,20 @@
             }
         }
 
-        function viewCollectionDetails(collectionName) {
-            // Switch to the collection and show its info
-            document.getElementById('collectionSelect').value = collectionName;
-            document.getElementById('queryCollectionSelect').value = collectionName;
-            showCollectionInfo(collectionName);
 
-            // Scroll to the collection info section
-            document.getElementById('collectionInfo').scrollIntoView({ behavior: 'smooth' });
-        }
+        function toggleCreateCollectionForm() {
+            const form = document.getElementById('createCollectionForm');
+            const toggle = document.getElementById('createCollectionToggle');
 
-        // Chunk configuration validation
-        function validateChunkConfig() {
-            const chunkSize = parseInt(document.getElementById('chunkSize').value);
-            const chunkOverlap = parseInt(document.getElementById('chunkOverlap').value);
-
-            if (chunkOverlap >= chunkSize) {
-                alert('⚠️ Chunk overlap must be smaller than chunk size!');
-                document.getElementById('chunkOverlap').style.borderColor = '#dc3545';
-                return false;
+            if (form.style.display === 'none') {
+                form.style.display = 'block';
+                toggle.textContent = '▼';
+            } else {
+                form.style.display = 'none';
+                toggle.textContent = '▶';
             }
-
-            if (chunkSize < 100) {
-                alert('⚠️ Chunk size should be at least 100 characters for meaningful content!');
-                document.getElementById('chunkSize').style.borderColor = '#dc3545';
-                return false;
-            }
-
-            // Reset border colors on valid input
-            document.getElementById('chunkSize').style.borderColor = '#28a745';
-            document.getElementById('chunkOverlap').style.borderColor = '#28a745';
-
-            // Show success message
-            showStatus(`✅ Chunk configuration validated: ${chunkSize} chars with ${chunkOverlap} overlap`, 'success');
-
-            // Reset border colors after a delay
-            setTimeout(() => {
-                document.getElementById('chunkSize').style.borderColor = '#ddd';
-                document.getElementById('chunkOverlap').style.borderColor = '#ddd';
-            }, 2000);
-
-            return true;
         }
 
-        // Get current chunk configuration
-        function getChunkConfig() {
-            return {
-                chunk_size: parseInt(document.getElementById('chunkSize').value),
-                chunk_overlap: parseInt(document.getElementById('chunkOverlap').value)
-            };
-        }
 
         // Export functionality
         let lastQueryResults = null;
@@ -2270,8 +2214,8 @@
                                     lastQueryResults.export_metadata?.search_params?.collection_name ||
                                     document.getElementById('queryCollectionSelect').value || null,
                     chunking_config: {
-                        chunk_size: parseInt(document.getElementById('chunkSize').value),
-                        chunk_overlap: parseInt(document.getElementById('chunkOverlap').value),
+                        chunk_size: lastQueryResults.export_metadata?.collection_info?.chunk_size || 1000,
+                        chunk_overlap: lastQueryResults.export_metadata?.collection_info?.chunk_overlap || 200,
                         text_splitter: "RecursiveCharacterTextSplitter"
                     },
                     search_params: lastQueryResults.export_metadata?.search_params || {},

@@ -135,7 +135,7 @@ class VectorStore:
         """List all available collections from document storage"""
         return self.document_storage.list_collections()
 
-    def create_collection(self, collection_name: str, embedding_model: str = None) -> bool:
+    def create_collection(self, collection_name: str, embedding_model: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> bool:
         """Create a new collection in both vector DB and document storage"""
         if embedding_model is None:
             embedding_model = self.default_embedding_model
@@ -151,6 +151,8 @@ class VectorStore:
                 # Update metadata for existing collection
                 self._collection_metadata[collection_name] = {
                     "embedding_model": embedding_model,
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap,
                     "created_at": str(uuid.uuid4())
                 }
                 self._save_collection_metadata()
@@ -160,7 +162,9 @@ class VectorStore:
                 name=collection_name,
                 metadata={
                     "description": "XML, JSON, and text documents with metadata",
-                    "embedding_model": embedding_model
+                    "embedding_model": embedding_model,
+                    "chunk_size": chunk_size,
+                    "chunk_overlap": chunk_overlap
                 }
             )
             self._collections[collection_name] = collection
@@ -168,6 +172,8 @@ class VectorStore:
             # Store collection metadata
             self._collection_metadata[collection_name] = {
                 "embedding_model": embedding_model,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
                 "created_at": str(uuid.uuid4())
             }
             self._save_collection_metadata()
@@ -298,11 +304,16 @@ class VectorStore:
         embedding_model = self._get_collection_embedding_model(collection_name)
         model_info = self.available_models.get(embedding_model, {})
 
+        chunk_size = self._collection_metadata.get(collection_name, {}).get("chunk_size", 1000)
+        chunk_overlap = self._collection_metadata.get(collection_name, {}).get("chunk_overlap", 200)
+
         return {
             "collection_name": collection_name,
             "embedding_model": embedding_model,
             "embedding_model_name": model_info.get("name", embedding_model),
-            "embedding_model_description": model_info.get("description", "Unknown model")
+            "embedding_model_description": model_info.get("description", "Unknown model"),
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap
         }
 
     def delete_collection(self, collection_name: str) -> bool:

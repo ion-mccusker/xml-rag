@@ -81,6 +81,8 @@ class SearchRequest(BaseModel):
 class CollectionRequest(BaseModel):
     collection_name: str
     embedding_model: Optional[str] = None
+    chunk_size: Optional[int] = 1000
+    chunk_overlap: Optional[int] = 200
 
 class QueryResponse(BaseModel):
     answer: str
@@ -129,9 +131,7 @@ async def home(request: Request):
 @app.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    collection_name: Optional[str] = Form("documents"),
-    chunk_size: Optional[int] = Form(1000),
-    chunk_overlap: Optional[int] = Form(200)
+    collection_name: Optional[str] = Form("documents")
 ):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
@@ -142,6 +142,11 @@ async def upload_document(
         raise HTTPException(status_code=400, detail=f"Only these file types are allowed: {', '.join(allowed_extensions)}")
 
     try:
+        # Get collection-specific chunking configuration
+        collection_info = current_rag.get_collection_info(collection_name)
+        chunk_size = collection_info.get("chunk_size", 1000)
+        chunk_overlap = collection_info.get("chunk_overlap", 200)
+
         content = await file.read()
         text_content = content.decode('utf-8')
 
@@ -175,12 +180,15 @@ async def upload_document(
 @app.post("/upload-batch")
 async def upload_batch_documents(
     files: List[UploadFile] = File(...),
-    collection_name: Optional[str] = Form("documents"),
-    chunk_size: Optional[int] = Form(1000),
-    chunk_overlap: Optional[int] = Form(200)
+    collection_name: Optional[str] = Form("documents")
 ):
     if not current_rag:
         raise HTTPException(status_code=503, detail="No RAG pipeline available - upload functionality disabled")
+
+    # Get collection-specific chunking configuration
+    collection_info = current_rag.get_collection_info(collection_name)
+    chunk_size = collection_info.get("chunk_size", 1000)
+    chunk_overlap = collection_info.get("chunk_overlap", 200)
 
     allowed_extensions = ['.xml', '.json', '.txt', '.md', '.py', '.js', '.html', '.css', '.log', '.csv']
     results = []
@@ -419,12 +427,19 @@ async def create_collection(collection_request: CollectionRequest):
         raise HTTPException(status_code=503, detail="No RAG pipeline available")
 
     try:
-        success = current_rag.create_collection(collection_request.collection_name, collection_request.embedding_model)
+        success = current_rag.create_collection(
+            collection_request.collection_name,
+            collection_request.embedding_model,
+            collection_request.chunk_size,
+            collection_request.chunk_overlap
+        )
         if success:
             return {
                 "message": f"Collection '{collection_request.collection_name}' created successfully",
                 "collection_name": collection_request.collection_name,
-                "embedding_model": collection_request.embedding_model
+                "embedding_model": collection_request.embedding_model,
+                "chunk_size": collection_request.chunk_size,
+                "chunk_overlap": collection_request.chunk_overlap
             }
         else:
             raise HTTPException(status_code=400, detail=f"Collection '{collection_request.collection_name}' already exists")
