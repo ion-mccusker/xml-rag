@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import pipeline
 from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
@@ -12,36 +12,45 @@ class HuggingFaceRAGPipeline:
     def __init__(self, persist_directory: str = "./chroma_db", model_name: str = "microsoft/DialoGPT-medium"):
         self.retriever = DocumentRetriever(persist_directory)
 
-        # Initialize HuggingFace model
+        # Initialize HuggingFace pipeline
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = 0 if torch.cuda.is_available() else -1  # 0 for GPU, -1 for CPU
 
         try:
-            print(f"Loading model {model_name} on {self.device}...")
-            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" if self.device == "cuda" else None,
+            print(f"Loading text generation pipeline with model {model_name}...")
+
+            # Create text generation pipeline
+            self.generator = pipeline(
+                "text-generation",
+                model=model_name,
+                device=self.device,
+                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                 trust_remote_code=True,
-                use_safetensors=True,
+                return_full_text=False,  # Only return generated text, not the input
+                pad_token_id=50256,  # Common pad token ID, will be overridden if tokenizer has one
             )
 
-            # Set pad token if not present
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
+            # Set pad token if tokenizer doesn't have one
+            if self.generator.tokenizer.pad_token is None:
+                self.generator.tokenizer.pad_token = self.generator.tokenizer.eos_token
 
             print(f"Successfully loaded {model_name}")
 
         except Exception as e:
             print(f"Error loading {model_name}: {str(e)}")
             print("Falling back to microsoft/DialoGPT-medium")
+
             # Fallback to a smaller, more reliable model
             self.model_name = "microsoft/DialoGPT-medium"
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
+            self.generator = pipeline(
+                "text-generation",
+                model=self.model_name,
+                device=self.device,
+                return_full_text=False
+            )
+
+            if self.generator.tokenizer.pad_token is None:
+                self.generator.tokenizer.pad_token = self.generator.tokenizer.eos_token
 
     def add_xml_document(self, xml_content: str, filename: str = None, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         return self.retriever.add_xml_document(xml_content, filename, collection_name, chunk_size, chunk_overlap)
@@ -86,31 +95,23 @@ Question: {query}
 Answer:"""
 
         try:
-            # Tokenize the input
-            inputs = self.tokenizer.encode(prompt, return_tensors="pt", truncation=True, max_length=1024)
-            inputs = inputs.to(self.device)
+            # Use the pipeline for text generation
+            generated_outputs = self.generator(
+                prompt,
+                max_new_tokens=max_length,
+                temperature=0.1,
+                do_sample=True,
+                truncation=True,
+                pad_token_id=self.generator.tokenizer.eos_token_id,
+                eos_token_id=self.generator.tokenizer.eos_token_id,
+                num_return_sequences=1
+            )
 
-            # Generate response
-            with torch.no_grad():
-                outputs = self.model.generate(
-                    inputs,
-                    max_length=inputs.shape[1] + max_length,
-                    num_return_sequences=1,
-                    temperature=0.1,
-                    do_sample=True,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    eos_token_id=self.tokenizer.eos_token_id,
-                    attention_mask=torch.ones_like(inputs)
-                )
-
-            # Decode the response
-            generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-            # Extract only the answer part (after "Answer:")
-            if "Answer:" in generated_text:
-                answer = generated_text.split("Answer:")[-1].strip()
+            # Extract the generated text
+            if generated_outputs and len(generated_outputs) > 0:
+                answer = generated_outputs[0]['generated_text'].strip()
             else:
-                answer = generated_text[len(prompt):].strip()
+                answer = ""
 
             # Clean up the answer
             if not answer or len(answer) < 10:
@@ -119,7 +120,7 @@ Answer:"""
             return answer
 
         except Exception as e:
-            return f"Error generating response with HuggingFace model: {str(e)}"
+            return f"Error generating response with HuggingFace pipeline: {str(e)}"
 
     def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, max_length: int = 512, collection_name: str = None) -> Dict[str, Any]:
         search_results = self.search_documents(question, n_results, where, collection_name)
@@ -173,6 +174,6 @@ Answer:"""
     def get_model_info(self) -> Dict[str, Any]:
         return {
             "model_name": self.model_name,
-            "device": self.device,
-            "model_type": "HuggingFace Transformers"
+            "device": "GPU" if self.device == 0 else "CPU",
+            "model_type": "HuggingFace Text Generation Pipeline"
         }
