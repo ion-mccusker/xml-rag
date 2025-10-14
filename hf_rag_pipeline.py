@@ -1,5 +1,5 @@
 import torch
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 from typing import List, Dict, Any, Optional
 import os
 from dotenv import load_dotenv
@@ -19,15 +19,28 @@ class HuggingFaceRAGPipeline:
         try:
             print(f"Loading text generation pipeline with model {model_name}...")
 
-            # Create text generation pipeline
+            # Load tokenizer and model separately with safetensors enabled
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                use_safetensors=True,
+                trust_remote_code=True
+            )
+
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                use_safetensors=True,
+                device_map="auto",
+                dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                trust_remote_code=True
+            )
+
+            # Create text generation pipeline with pre-loaded model and tokenizer
             self.generator = pipeline(
                 "text-generation",
-                model=model_name,
-                device=self.device,
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                trust_remote_code=True,
+                model=model,
+                tokenizer=tokenizer,
                 return_full_text=False,  # Only return generated text, not the input
-                pad_token_id=50256,  # Common pad token ID, will be overridden if tokenizer has one
+                pad_token_id=50256  # Common pad token ID, will be overridden if tokenizer has one
             )
 
             # Set pad token if tokenizer doesn't have one
@@ -42,10 +55,23 @@ class HuggingFaceRAGPipeline:
 
             # Fallback to a smaller, more reliable model
             self.model_name = "microsoft/DialoGPT-medium"
+
+            # Load tokenizer and model separately with safetensors
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                use_safetensors=True
+            )
+
+            model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                use_safetensors=True,
+                device_map="auto"
+            )
+
             self.generator = pipeline(
                 "text-generation",
-                model=self.model_name,
-                device=self.device,
+                model=model,
+                tokenizer=tokenizer,
                 return_full_text=False
             )
 
@@ -95,6 +121,7 @@ Question: {query}
 Answer:"""
 
         try:
+            print(prompt)
             # Use the pipeline for text generation
             generated_outputs = self.generator(
                 prompt,
