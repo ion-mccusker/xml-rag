@@ -23,6 +23,9 @@
                 <li class="tab-nav-item">
                     <a class="tab-nav-link" onclick="switchTab(event, 'uploadTab')">📤 Upload Documents</a>
                 </li>
+                <li class="tab-nav-item">
+                    <a class="tab-nav-link" onclick="switchTab(event, 'documentsTab')">📄 Uploaded Documents</a>
+                </li>
             </ul>
 
             <div class="tab-content">
@@ -105,6 +108,51 @@
                     <div class="progress-text" id="progressText" style="display: none;"></div>
                     <div id="uploadStatus"></div>
                     <div id="fileProgressContainer"></div>
+                </div>
+
+                <!-- Uploaded Documents Tab -->
+                <div id="documentsTab" class="tab-pane">
+                    <div class="document-search">
+                        <input type="text" id="documentSearchInput" placeholder="Search documents by filename, title, or content..." />
+                        <select id="documentTypeFilter">
+                            <option value="">All Types</option>
+                            <option value="xml">XML</option>
+                            <option value="json">JSON</option>
+                            <option value="text">Text</option>
+                        </select>
+                        <select id="documentCollectionFilter">
+                            <option value="">All Collections</option>
+                        </select>
+                        <button onclick="searchDocumentList()">Search</button>
+                        <button onclick="clearDocumentSearch()">Clear</button>
+                    </div>
+                    <div class="document-stats" id="documentStats">
+                        <span id="documentCount">Loading...</span>
+                        <span id="documentRange"></span>
+                    </div>
+                    <div class="document-list" id="documentList">
+                        {% if documents %}
+                            {% for doc in documents %}
+                            <div class="document-item" onclick="viewDocument('{{ doc.document_id }}', '{{ doc.filename }}')">
+                                <span class="doc-type-badge doc-type-{{ doc.document_type or 'xml' }}">{{ (doc.document_type or 'xml')|upper }}</span>
+                                <strong>{{ doc.filename }}</strong> -
+                                {% if doc.document_type == 'json' %}
+                                    {{ doc.data_type }} ({{ doc.total_keys }} keys)
+                                {% elif doc.document_type == 'text' %}
+                                    {{ doc.total_words }} words, {{ doc.total_lines }} lines
+                                    {% if doc.title %} - "{{ doc.title }}"{% endif %}
+                                {% else %}
+                                    {{ doc.root_tag }} ({{ doc.element_count }} elements)
+                                {% endif %}
+                                <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No documents uploaded yet.</p>
+                        {% endif %}
+                    </div>
+                    <div class="pagination" id="documentPagination"></div>
+                    <button onclick="refreshDocuments()" style="margin-top: 10px;">Refresh List</button>
                 </div>
             </div>
         </div>
@@ -240,51 +288,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="section">
-            <h3>Uploaded Documents</h3>
-            <div class="document-search">
-                <input type="text" id="documentSearchInput" placeholder="Search documents by filename, title, or content..." />
-                <select id="documentTypeFilter">
-                    <option value="">All Types</option>
-                    <option value="xml">XML</option>
-                    <option value="json">JSON</option>
-                    <option value="text">Text</option>
-                </select>
-                <select id="documentCollectionFilter">
-                    <option value="">All Collections</option>
-                </select>
-                <button onclick="searchDocumentList()">Search</button>
-                <button onclick="clearDocumentSearch()">Clear</button>
-            </div>
-            <div class="document-stats" id="documentStats">
-                <span id="documentCount">Loading...</span>
-                <span id="documentRange"></span>
-            </div>
-            <div class="document-list" id="documentList">
-                {% if documents %}
-                    {% for doc in documents %}
-                    <div class="document-item" onclick="viewDocument('{{ doc.document_id }}', '{{ doc.filename }}')">
-                        <span class="doc-type-badge doc-type-{{ doc.document_type or 'xml' }}">{{ (doc.document_type or 'xml')|upper }}</span>
-                        <strong>{{ doc.filename }}</strong> -
-                        {% if doc.document_type == 'json' %}
-                            {{ doc.data_type }} ({{ doc.total_keys }} keys)
-                        {% elif doc.document_type == 'text' %}
-                            {{ doc.total_words }} words, {{ doc.total_lines }} lines
-                            {% if doc.title %} - "{{ doc.title }}"{% endif %}
-                        {% else %}
-                            {{ doc.root_tag }} ({{ doc.element_count }} elements)
-                        {% endif %}
-                        <small style="display: block; color: #666; margin-top: 3px;">Click to view full content</small>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <p>No documents uploaded yet.</p>
-                {% endif %}
-            </div>
-            <div class="pagination" id="documentPagination"></div>
-            <button onclick="refreshDocuments()" style="margin-top: 10px;">Refresh List</button>
         </div>
     </div>
 
