@@ -4,492 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document RAG System</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-        }
-        .section {
-            margin-bottom: 30px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .section h3 {
-            margin-top: 0;
-            color: #555;
-        }
-        .upload-area {
-            border: 2px dashed #ccc;
-            padding: 20px;
-            text-align: center;
-            border-radius: 5px;
-            margin-bottom: 10px;
-        }
-        .upload-area:hover {
-            border-color: #999;
-        }
-        input[type="file"] {
-            margin: 10px 0;
-        }
-        button {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .query-input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
-        .results {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        .source {
-            background-color: #e9ecef;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 5px;
-            font-size: 13px;
-            border-left: 4px solid #007bff;
-        }
-        .retrieval-section {
-            background-color: #f8f9fa;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-        }
-        .retrieved-chunk {
-            background-color: #ffffff;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-            font-size: 12px;
-        }
-        .doc-type-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .doc-type-xml {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .doc-type-json {
-            background-color: #cce5ff;
-            color: #004085;
-        }
-        .doc-type-text {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        .document-list {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        .document-item {
-            padding: 8px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .document-item:hover {
-            background-color: #f8f9fa;
-        }
-        .document-modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .document-modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 1000px;
-            height: 80%;
-            position: relative;
-            overflow: hidden;
-        }
-        .document-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-        }
-        .document-modal-body {
-            height: calc(100% - 80px);
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            white-space: pre-wrap;
-        }
-        .close-modal {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .close-modal:hover {
-            background: #c82333;
-        }
-        .clickable-chunk {
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .clickable-chunk:hover {
-            background-color: #e9ecef !important;
-        }
-        .chunk-modal {
-            display: none;
-            position: fixed;
-            z-index: 1001;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-        }
-        .chunk-modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 800px;
-            height: 70%;
-            position: relative;
-            overflow: hidden;
-        }
-        .chunk-modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-        }
-        .chunk-modal-body {
-            height: calc(100% - 80px);
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 12px;
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            white-space: pre-wrap;
-        }
-        .status {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-        }
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .loading {
-            display: none;
-            color: #007bff;
-        }
-        .progress-container {
-            width: 100%;
-            background-color: #f0f0f0;
-            border-radius: 10px;
-            margin: 15px 0;
-            overflow: hidden;
-            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-            display: none;
-        }
-        .progress-bar {
-            width: 0%;
-            height: 25px;
-            background: linear-gradient(45deg, #007bff, #0056b3);
-            border-radius: 10px;
-            text-align: center;
-            line-height: 25px;
-            color: white;
-            font-size: 12px;
-            font-weight: bold;
-            transition: width 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        .progress-bar::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            right: 0;
-            background-image: linear-gradient(
-                -45deg,
-                rgba(255, 255, 255, 0.2) 25%,
-                transparent 25%,
-                transparent 50%,
-                rgba(255, 255, 255, 0.2) 50%,
-                rgba(255, 255, 255, 0.2) 75%,
-                transparent 75%,
-                transparent
-            );
-            z-index: 1;
-            background-size: 50px 50px;
-            animation: move 2s linear infinite;
-        }
-        @keyframes move {
-            0% {
-                background-position: 0 0;
-            }
-            100% {
-                background-position: 50px 50px;
-            }
-        }
-        .progress-text {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-            text-align: center;
-        }
-        .file-progress {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-        }
-        .file-progress-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .file-name {
-            font-weight: bold;
-            color: #333;
-            font-size: 13px;
-        }
-        .file-status {
-            font-size: 12px;
-            padding: 2px 8px;
-            border-radius: 12px;
-            color: white;
-        }
-        .file-status.processing {
-            background-color: #007bff;
-        }
-        .file-status.success {
-            background-color: #28a745;
-        }
-        .file-status.error {
-            background-color: #dc3545;
-        }
-        .document-search {
-            margin-bottom: 15px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .document-search input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        .document-search select {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        .document-search button {
-            padding: 8px 15px;
-            font-size: 12px;
-        }
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 15px;
-            gap: 5px;
-        }
-        .pagination button {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            background-color: white;
-            color: #333;
-            cursor: pointer;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        .pagination button:hover:not(:disabled) {
-            background-color: #007bff;
-            color: white;
-        }
-        .pagination button:disabled {
-            background-color: #f8f9fa;
-            color: #6c757d;
-            cursor: not-allowed;
-        }
-        .pagination button.active {
-            background-color: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .pagination-info {
-            margin: 0 15px;
-            color: #666;
-            font-size: 14px;
-        }
-        .document-stats {
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            font-size: 14px;
-            color: #666;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .metadata-section {
-            margin-bottom: 15px;
-        }
-        .metadata-header {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            padding: 10px;
-            background-color: #e9ecef;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-            transition: background-color 0.2s;
-        }
-        .metadata-header:hover {
-            background-color: #dee2e6;
-        }
-        .metadata-header h4 {
-            margin: 0;
-            flex: 1;
-            color: #495057;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .metadata-toggle {
-            font-size: 12px;
-            color: #6c757d;
-            transition: transform 0.2s;
-        }
-        .metadata-toggle.expanded {
-            transform: rotate(90deg);
-        }
-        .metadata-content {
-            display: none;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-top: none;
-            border-radius: 0 0 5px 5px;
-        }
-        .metadata-content.expanded {
-            display: block;
-        }
-        .metadata-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .metadata-item {
-            padding: 8px 12px;
-            background-color: white;
-            border-radius: 3px;
-            border: 1px solid #e9ecef;
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-        }
-        .metadata-item strong {
-            color: #495057;
-            font-size: 12px;
-            font-weight: bold;
-            white-space: nowrap;
-            flex-shrink: 0;
-            min-width: 120px;
-        }
-        .metadata-value {
-            color: #6c757d;
-            font-size: 12px;
-            font-family: monospace;
-            word-break: break-word;
-            flex: 1;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-        .metadata-summary {
-            color: #6c757d;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
     <div class="container">
@@ -504,36 +19,36 @@
             <h3>📂 Collections Management</h3>
 
             <!-- Create New Collection Form -->
-            <div style="margin-bottom: 20px; border: 1px solid #e9ecef; border-radius: 8px;">
-                <div onclick="toggleCreateCollectionForm()" style="padding: 15px; background-color: #f8f9fa; border-radius: 8px 8px 0 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
-                    <h4 style="margin: 0; color: #495057; font-size: 16px;">➕ Create New Collection</h4>
+            <div class="card mb-20">
+                <div onclick="toggleCreateCollectionForm()" class="card-header flex-between">
+                    <h4 class="heading-md">➕ Create New Collection</h4>
                     <span id="createCollectionToggle" style="font-size: 18px; color: #495057;">▼</span>
                 </div>
-                <div id="createCollectionForm" style="padding: 15px; background-color: white; border-radius: 0 0 8px 8px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; align-items: end; margin-bottom: 15px;">
+                <div id="createCollectionForm" class="card-body">
+                    <div class="grid-3col mb-15">
                         <div>
-                            <label for="newCollectionName" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Collection Name:</label>
-                            <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                            <small style="color: #666; font-size: 12px;">Letters, numbers, hyphens, and underscores only</small>
+                            <label for="newCollectionName" class="label">Collection Name:</label>
+                            <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" class="input-text">
+                            <small class="text-sm text-muted">Letters, numbers, hyphens, and underscores only</small>
                         </div>
                         <div>
-                            <label for="embeddingModelSelect" style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Embedding Model:</label>
-                            <select id="embeddingModelSelect" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                            <label for="embeddingModelSelect" class="label">Embedding Model:</label>
+                            <select id="embeddingModelSelect" class="input-text">
                                 <option value="">Default Model</option>
                             </select>
-                            <small style="color: #666; font-size: 12px;">Select your embedding model</small>
+                            <small class="text-sm text-muted">Select your embedding model</small>
                         </div>
                         <div>
-                            <label style="display: block; font-weight: bold; color: #333; margin-bottom: 5px;">Default Chunking:</label>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Size">
-                                <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" style="width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px;" title="Chunk Overlap">
+                            <label class="label">Default Chunking:</label>
+                            <div class="flex" style="gap: 10px;">
+                                <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" class="input-select" style="width: 80px;" title="Chunk Size">
+                                <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" class="input-select" style="width: 80px;" title="Chunk Overlap">
                             </div>
-                            <small style="color: #666; font-size: 11px;">Size / Overlap</small>
+                            <small class="text-sm text-muted">Size / Overlap</small>
                         </div>
                     </div>
                     <div>
-                        <button onclick="createNewCollection()" style="padding: 10px 20px; font-size: 14px; background-color: #28a745; border: none; color: white; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                        <button onclick="createNewCollection()" class="btn-success">
                             ➕ Create Collection
                         </button>
                     </div>
@@ -541,10 +56,10 @@
             </div>
 
             <!-- Existing Collections List -->
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin: 0 0 10px 0; color: #495057; font-size: 16px;">📋 Existing Collections</h4>
-                <div id="collectionsListContainer" style="background-color: white; border: 1px solid #ddd; border-radius: 5px; max-height: 300px; overflow-y: auto;">
-                    <div id="collectionsList" style="padding: 10px;">
+            <div class="mb-20">
+                <h4 class="heading-md">📋 Existing Collections</h4>
+                <div id="collectionsListContainer" class="card scrollable-container">
+                    <div id="collectionsList" class="p-10">
                         Loading collections...
                     </div>
                 </div>
@@ -553,17 +68,17 @@
 
         <div class="section">
             <h3>Upload Documents</h3>
-            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <label for="collectionSelect" style="font-weight: bold; color: #333;">Collection:</label>
-                    <select id="collectionSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 150px;">
+            <div class="flex-center flex-gap-md flex-wrap mb-15">
+                <div class="flex-center flex-gap-sm">
+                    <label for="collectionSelect" class="label" style="margin-bottom: 0;">Collection:</label>
+                    <select id="collectionSelect" class="input-select" style="min-width: 150px;">
                         <option value="documents">documents (default)</option>
                     </select>
                 </div>
             </div>
 
             <!-- Collection Info -->
-            <div id="collectionInfo" style="margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; font-size: 13px; color: #495057; display: none;">
+            <div id="collectionInfo" class="info-box mb-15" style="display: none;">
                 <strong>📊 Collection Info:</strong>
                 <span id="collectionInfoText">Loading...</span>
             </div>
@@ -585,10 +100,10 @@
         <div class="section">
             <h3>Query Documents</h3>
             {% if pipelines_available %}
-            <div style="margin-bottom: 15px; display: flex; gap: 15px; flex-wrap: wrap;">
-                <div style="display: flex; flex-direction: column;">
-                    <label for="pipelineSelect" style="margin-bottom: 5px; font-weight: bold;">AI Model:</label>
-                    <select id="pipelineSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+            <div class="flex flex-gap-md flex-wrap mb-15">
+                <div class="flex-col">
+                    <label for="pipelineSelect" class="label">AI Model:</label>
+                    <select id="pipelineSelect" class="input-select">
                         {% if openai_available %}
                         <option value="openai">OpenAI GPT-3.5-turbo (Cloud)</option>
                         {% endif %}
@@ -600,15 +115,15 @@
                         {% endif %}
                     </select>
                 </div>
-                <div style="display: flex; flex-direction: column;">
-                    <label for="queryCollectionSelect" style="margin-bottom: 5px; font-weight: bold;">Search Collection:</label>
-                    <select id="queryCollectionSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 150px;">
+                <div class="flex-col">
+                    <label for="queryCollectionSelect" class="label">Search Collection:</label>
+                    <select id="queryCollectionSelect" class="input-select" style="min-width: 150px;">
                         <option value="documents">documents (default)</option>
                     </select>
                 </div>
-                <div style="display: flex; flex-direction: column;">
-                    <label for="resultCountSelect" style="margin-bottom: 5px; font-weight: bold;">Results Count:</label>
-                    <select id="resultCountSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; min-width: 100px;">
+                <div class="flex-col">
+                    <label for="resultCountSelect" class="label">Results Count:</label>
+                    <select id="resultCountSelect" class="input-select" style="min-width: 100px;">
                         <option value="3">3 results</option>
                         <option value="5" selected>5 results</option>
                         <option value="10">10 results</option>
@@ -618,15 +133,15 @@
                 </div>
             </div>
             <input type="text" id="queryInput" class="query-input" placeholder="Ask a question about your documents..." />
-            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
-                <button onclick="searchDocuments()" style="background-color: #28a745;">Search Only</button>
+            <div class="flex-center flex-gap-md mb-10">
+                <button onclick="searchDocuments()" class="btn-success">Search Only</button>
                 <button onclick="queryDocuments()">Search & Ask</button>
-                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
+                <label class="flex-center" style="gap: 5px; cursor: pointer; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
                     <input type="checkbox" id="useReranker" style="cursor: pointer; width: 16px; height: 16px;">
                     <span style="font-weight: 500; color: #333;">Use Reranker</span>
                 </label>
-                <label for="lobSelect" style="font-weight: bold; color: #333;">LOB:</label>
-                <select id="lobSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                <label for="lobSelect" class="label" style="margin-bottom: 0;">LOB:</label>
+                <select id="lobSelect" class="input-select">
                     <option value="">All</option>
                     <option value="Centralized Commercial Credit">Centralized Commercial Credit</option>
                     <option value="Regional Commercial Credit">Regional Commercial Credit</option>

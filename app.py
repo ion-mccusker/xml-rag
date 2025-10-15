@@ -26,6 +26,9 @@ logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Document RAG System", description="RAG system for XML, JSON, and text documents")
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 templates = Jinja2Templates(directory="templates")
 
 # Initialize pipelines with fallback logic
