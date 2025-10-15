@@ -3,6 +3,7 @@ from xml_processor import XMLProcessor
 from json_processor import JSONProcessor
 from text_processor import TextProcessor
 from vector_store import VectorStore
+from sentence_transformers import CrossEncoder
 
 
 class DocumentRetriever:
@@ -11,6 +12,11 @@ class DocumentRetriever:
         self.xml_processor = XMLProcessor()
         self.json_processor = JSONProcessor()
         self.text_processor = TextProcessor()
+
+        # Load cross-encoder model at startup
+        print("Loading cross-encoder model: cross-encoder/ms-marco-MiniLM-L-6-v2...")
+        self.cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+        print("Cross-encoder model loaded successfully")
 
     def add_xml_document(self, xml_content: str, filename: str = None, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         document_data = self.xml_processor.extract_text_and_metadata(xml_content, filename)
@@ -40,8 +46,48 @@ class DocumentRetriever:
         document_data = self.text_processor.process_file(file_path)
         return self.vector_store.add_document(document_data, collection_name)
 
-    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None) -> List[Dict[str, Any]]:
-        return self.vector_store.search(query, n_results, where, collection_name)
+    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        results = self.vector_store.search(query, n_results, where, collection_name)
+
+        if use_reranker and results:
+            results = self._rerank_results(query, results)
+
+        return results
+
+    def _rerank_results(self, query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Rerank search results using cross-encoder"""
+        if not results:
+            return results
+
+        # Prepare query-document pairs for cross-encoder
+        pairs = [[query, result['document']] for result in results]
+
+        # Get cross-encoder scores
+        scores = self.cross_encoder.predict(pairs)
+
+        # Add cross-encoder scores to results and sort by them
+        for i, result in enumerate(results):
+            result['cross_encoder_score'] = float(scores[i])
+            result['original_distance'] = result['distance']  # Store original distance
+            result['original_relevance_score'] = result.get('relevance_score', round(1 - (result['distance'] / 2), 3))
+
+        # Sort by cross-encoder score (higher is better)
+        reranked_results = sorted(results, key=lambda x: x['cross_encoder_score'], reverse=True)
+
+        # Update distances based on new ranking (normalized cross-encoder scores)
+        # Cross-encoder scores can be negative, so we normalize them
+        if len(reranked_results) > 0:
+            min_score = min(r['cross_encoder_score'] for r in reranked_results)
+            max_score = max(r['cross_encoder_score'] for r in reranked_results)
+            score_range = max_score - min_score if max_score != min_score else 1
+
+            for result in reranked_results:
+                # Normalize to 0-1 range, then invert so lower distance = better match
+                normalized_score = (result['cross_encoder_score'] - min_score) / score_range
+                result['distance'] = 1 - normalized_score
+                result['relevance_score'] = normalized_score
+
+        return reranked_results
 
     def delete_document(self, document_id: str, collection_name: str = None):
         self.vector_store.delete_document(document_id, collection_name)

@@ -35,8 +35,8 @@ class RAGPipeline:
     def add_text_file(self, file_path: str, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         return self.retriever.add_text_file(file_path, collection_name, chunk_size, chunk_overlap)
 
-    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None) -> List[Dict[str, Any]]:
-        return self.retriever.search_documents(query, n_results, where, collection_name)
+    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        return self.retriever.search_documents(query, n_results, where, collection_name, use_reranker)
 
     def generate_answer(self, query: str, context_results: List[Dict[str, Any]], model: str = "gpt-3.5-turbo") -> str:
         context_text = "\n\n".join([
@@ -70,8 +70,8 @@ Please provide a comprehensive answer based on the context above."""
         except Exception as e:
             return f"Error generating response: {str(e)}"
 
-    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, model: str = "gpt-3.5-turbo", collection_name: str = None) -> Dict[str, Any]:
-        search_results = self.search_documents(question, n_results, where, collection_name)
+    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, model: str = "gpt-3.5-turbo", collection_name: str = None, use_reranker: bool = False) -> Dict[str, Any]:
+        search_results = self.search_documents(question, n_results, where, collection_name, use_reranker)
 
         if not search_results:
             return {
@@ -86,7 +86,8 @@ Please provide a comprehensive answer based on the context above."""
             "answer": answer,
             "sources": self.retriever._format_sources(search_results, collection_name),
             "query": question,
-            "retrieved_chunks": search_results
+            "retrieved_chunks": search_results,
+            "reranker_used": use_reranker
         }
 
     def delete_document(self, document_id: str, collection_name: str = None):

@@ -96,8 +96,8 @@ class HuggingFaceRAGPipeline:
     def add_text_file(self, file_path: str, collection_name: str = None, chunk_size: int = 1000, chunk_overlap: int = 200) -> str:
         return self.retriever.add_text_file(file_path, collection_name, chunk_size, chunk_overlap)
 
-    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None) -> List[Dict[str, Any]]:
-        return self.retriever.search_documents(query, n_results, where, collection_name)
+    def search_documents(self, query: str, n_results: int = 5, where: Optional[Dict] = None, collection_name: str = None, use_reranker: bool = False) -> List[Dict[str, Any]]:
+        return self.retriever.search_documents(query, n_results, where, collection_name, use_reranker)
 
     def generate_answer(self, query: str, context_results: List[Dict[str, Any]], max_length: int = 512) -> str:
         context_text = "\n\n".join([
@@ -149,8 +149,8 @@ Answer:"""
         except Exception as e:
             return f"Error generating response with HuggingFace pipeline: {str(e)}"
 
-    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, max_length: int = 512, collection_name: str = None) -> Dict[str, Any]:
-        search_results = self.search_documents(question, n_results, where, collection_name)
+    def query(self, question: str, n_results: int = 5, where: Optional[Dict] = None, max_length: int = 512, collection_name: str = None, use_reranker: bool = False) -> Dict[str, Any]:
+        search_results = self.search_documents(question, n_results, where, collection_name, use_reranker)
 
         if not search_results:
             return {
@@ -167,7 +167,8 @@ Answer:"""
             "sources": self.retriever._format_sources(search_results, collection_name),
             "query": question,
             "retrieved_chunks": search_results,
-            "model_used": f"HuggingFace: {self.model_name}"
+            "model_used": f"HuggingFace: {self.model_name}",
+            "reranker_used": use_reranker
         }
 
     def delete_document(self, document_id: str, collection_name: str = None):

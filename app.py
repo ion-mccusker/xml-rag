@@ -72,11 +72,13 @@ class QueryRequest(BaseModel):
     max_results: Optional[int] = 5
     pipeline: Optional[str] = "openai"  # "openai" or "huggingface"
     collection_name: Optional[str] = "documents"
+    use_reranker: Optional[bool] = False
 
 class SearchRequest(BaseModel):
     question: str
     max_results: Optional[int] = 5
     collection_name: Optional[str] = "documents"
+    use_reranker: Optional[bool] = False
 
 class CollectionRequest(BaseModel):
     collection_name: str
@@ -270,7 +272,8 @@ async def query_documents(query_request: QueryRequest):
         result = selected_rag.query(
             question=query_request.question,
             n_results=query_request.max_results,
-            collection_name=query_request.collection_name
+            collection_name=query_request.collection_name,
+            use_reranker=query_request.use_reranker
         )
 
         # Calculate response time
@@ -309,7 +312,8 @@ async def search_documents(search_request: SearchRequest):
         search_results = current_rag.search_documents(
             query=search_request.question,
             n_results=search_request.max_results,
-            collection_name=search_request.collection_name
+            collection_name=search_request.collection_name,
+            use_reranker=search_request.use_reranker
         )
 
         # Calculate response time

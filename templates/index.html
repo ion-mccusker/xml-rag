@@ -621,6 +621,10 @@
             <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                 <button onclick="searchDocuments()" style="background-color: #28a745;">Search Only</button>
                 <button onclick="queryDocuments()">Search & Ask</button>
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
+                    <input type="checkbox" id="useReranker" style="cursor: pointer; width: 16px; height: 16px;">
+                    <span style="font-weight: 500; color: #333;">Use Reranker</span>
+                </label>
                 <label for="lobSelect" style="font-weight: bold; color: #333;">LOB:</label>
                 <select id="lobSelect" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
                     <option value="">All</option>
@@ -646,6 +650,10 @@
             <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
                 <button onclick="searchDocuments()" style="background-color: #28a745;" disabled>Search Only (Disabled)</button>
                 <button onclick="queryDocuments()" disabled>Search & Ask (Disabled)</button>
+                <label style="display: flex; align-items: center; gap: 5px; cursor: not-allowed; padding: 8px 12px; background-color: #e9ecef; border: 1px solid #ddd; border-radius: 5px; opacity: 0.6;">
+                    <input type="checkbox" id="useRerankerDisabled" disabled style="cursor: not-allowed; width: 16px; height: 16px;">
+                    <span style="font-weight: 500; color: #6c757d;">Use Reranker</span>
+                </label>
                 <label for="lobSelectDisabled" style="font-weight: bold; color: #333;">LOB:</label>
                 <select id="lobSelectDisabled" style="padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;" disabled>
                     <option value="">All</option>
@@ -1084,7 +1092,8 @@
                         question: question,
                         max_results: parseInt(document.getElementById('resultCountSelect').value),
                         pipeline: pipelineSelect.value,
-                        collection_name: document.getElementById('queryCollectionSelect').value
+                        collection_name: document.getElementById('queryCollectionSelect').value,
+                        use_reranker: document.getElementById('useReranker').checked
                     })
                 });
 
@@ -1136,7 +1145,8 @@
                     body: JSON.stringify({
                         question: question,
                         max_results: parseInt(document.getElementById('resultCountSelect').value),
-                        collection_name: document.getElementById('queryCollectionSelect').value
+                        collection_name: document.getElementById('queryCollectionSelect').value,
+                        use_reranker: document.getElementById('useReranker').checked
                     })
                 });
 
