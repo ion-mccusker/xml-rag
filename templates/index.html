@@ -14,87 +14,99 @@
             <p><strong>Documents in database: <span id="totalDocumentCount">{{ document_count }}</span></strong></p>
         </div>
 
-        <!-- Collections Management -->
-        <div class="section">
-            <h3>📂 Collections Management</h3>
+        <!-- Collections & Upload Tabs -->
+        <div class="section tab-container">
+            <ul class="tab-nav">
+                <li class="tab-nav-item">
+                    <a class="tab-nav-link active" onclick="switchTab(event, 'collectionsTab')">📂 Collections Management</a>
+                </li>
+                <li class="tab-nav-item">
+                    <a class="tab-nav-link" onclick="switchTab(event, 'uploadTab')">📤 Upload Documents</a>
+                </li>
+            </ul>
 
-            <!-- Create New Collection Form -->
-            <div class="card mb-20">
-                <div onclick="toggleCreateCollectionForm()" class="card-header flex-between">
-                    <h4 class="heading-md">➕ Create New Collection</h4>
-                    <span id="createCollectionToggle" style="font-size: 18px; color: #495057;">▼</span>
-                </div>
-                <div id="createCollectionForm" class="card-body">
-                    <div class="grid-3col mb-15">
-                        <div>
-                            <label for="newCollectionName" class="label">Collection Name:</label>
-                            <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" class="input-text">
-                            <small class="text-sm text-muted">Letters, numbers, hyphens, and underscores only</small>
+            <div class="tab-content">
+                <!-- Collections Tab -->
+                <div id="collectionsTab" class="tab-pane active">
+                    <!-- Create New Collection Form -->
+                    <div class="card mb-20">
+                        <div onclick="toggleCreateCollectionForm()" class="card-header flex-between">
+                            <h4 class="heading-md">➕ Create New Collection</h4>
+                            <span id="createCollectionToggle" style="font-size: 18px; color: #495057;">▶</span>
                         </div>
-                        <div>
-                            <label for="embeddingModelSelect" class="label">Embedding Model:</label>
-                            <select id="embeddingModelSelect" class="input-text">
-                                <option value="">Default Model</option>
-                            </select>
-                            <small class="text-sm text-muted">Select your embedding model</small>
-                        </div>
-                        <div>
-                            <label class="label">Default Chunking:</label>
-                            <div class="flex" style="gap: 10px;">
-                                <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" class="input-select" style="width: 80px;" title="Chunk Size">
-                                <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" class="input-select" style="width: 80px;" title="Chunk Overlap">
+                        <div id="createCollectionForm" class="card-body" style="display: none;">
+                            <div class="grid-3col mb-15">
+                                <div>
+                                    <label for="newCollectionName" class="label">Collection Name:</label>
+                                    <input type="text" id="newCollectionName" placeholder="e.g., technical-docs" class="input-text">
+                                    <small class="text-sm text-muted">Letters, numbers, hyphens, and underscores only</small>
+                                </div>
+                                <div>
+                                    <label for="embeddingModelSelect" class="label">Embedding Model:</label>
+                                    <select id="embeddingModelSelect" class="input-text">
+                                        <option value="">Default Model</option>
+                                    </select>
+                                    <small class="text-sm text-muted">Select your embedding model</small>
+                                </div>
+                                <div>
+                                    <label class="label">Default Chunking:</label>
+                                    <div class="flex" style="gap: 10px;">
+                                        <input type="number" id="newCollectionChunkSize" value="1000" min="100" max="4000" class="input-select" style="width: 80px;" title="Chunk Size">
+                                        <input type="number" id="newCollectionChunkOverlap" value="200" min="0" max="500" class="input-select" style="width: 80px;" title="Chunk Overlap">
+                                    </div>
+                                    <small class="text-sm text-muted">Size / Overlap</small>
+                                </div>
                             </div>
-                            <small class="text-sm text-muted">Size / Overlap</small>
+                            <div>
+                                <button onclick="createNewCollection()" class="btn-success">
+                                    ➕ Create Collection
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <button onclick="createNewCollection()" class="btn-success">
-                            ➕ Create Collection
-                        </button>
+
+                    <!-- Existing Collections List -->
+                    <div class="mb-20">
+                        <h4 class="heading-md">📋 Existing Collections</h4>
+                        <div id="collectionsListContainer" class="card scrollable-container">
+                            <div id="collectionsList" class="p-10">
+                                Loading collections...
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Existing Collections List -->
-            <div class="mb-20">
-                <h4 class="heading-md">📋 Existing Collections</h4>
-                <div id="collectionsListContainer" class="card scrollable-container">
-                    <div id="collectionsList" class="p-10">
-                        Loading collections...
+                <!-- Upload Tab -->
+                <div id="uploadTab" class="tab-pane">
+                    <div class="flex-center flex-gap-md flex-wrap mb-15">
+                        <div class="flex-center flex-gap-sm">
+                            <label for="collectionSelect" class="label" style="margin-bottom: 0;">Collection:</label>
+                            <select id="collectionSelect" class="input-select" style="min-width: 150px;">
+                                <option value="documents">documents (default)</option>
+                            </select>
+                        </div>
                     </div>
+
+                    <!-- Collection Info -->
+                    <div id="collectionInfo" class="info-box mb-15" style="display: none;">
+                        <strong>📊 Collection Info:</strong>
+                        <span id="collectionInfoText">Loading...</span>
+                    </div>
+
+                    <div class="upload-area">
+                        <p>Select one or more XML, JSON, or text files to upload</p>
+                        <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
+                        <br>
+                        <button onclick="uploadFiles()">Upload Documents</button>
+                    </div>
+                    <div class="progress-container" id="progressContainer">
+                        <div class="progress-bar" id="progressBar">0%</div>
+                    </div>
+                    <div class="progress-text" id="progressText" style="display: none;"></div>
+                    <div id="uploadStatus"></div>
+                    <div id="fileProgressContainer"></div>
                 </div>
             </div>
-        </div>
-
-        <div class="section">
-            <h3>Upload Documents</h3>
-            <div class="flex-center flex-gap-md flex-wrap mb-15">
-                <div class="flex-center flex-gap-sm">
-                    <label for="collectionSelect" class="label" style="margin-bottom: 0;">Collection:</label>
-                    <select id="collectionSelect" class="input-select" style="min-width: 150px;">
-                        <option value="documents">documents (default)</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Collection Info -->
-            <div id="collectionInfo" class="info-box mb-15" style="display: none;">
-                <strong>📊 Collection Info:</strong>
-                <span id="collectionInfoText">Loading...</span>
-            </div>
-
-            <div class="upload-area">
-                <p>Select one or more XML, JSON, or text files to upload</p>
-                <input type="file" id="documentFile" accept=".xml,.json,.txt,.md,.py,.js,.html,.css,.log,.csv" multiple />
-                <br>
-                <button onclick="uploadFiles()">Upload Documents</button>
-            </div>
-            <div class="progress-container" id="progressContainer">
-                <div class="progress-bar" id="progressBar">0%</div>
-            </div>
-            <div class="progress-text" id="progressText" style="display: none;"></div>
-            <div id="uploadStatus"></div>
-            <div id="fileProgressContainer"></div>
         </div>
 
         <div class="section">
@@ -1711,6 +1723,29 @@
             }
         }
 
+
+        // Tab switching functionality
+        function switchTab(event, tabId) {
+            event.preventDefault();
+
+            // Hide all tab panes
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            tabPanes.forEach(pane => {
+                pane.classList.remove('active');
+            });
+
+            // Remove active class from all tab links
+            const tabLinks = document.querySelectorAll('.tab-nav-link');
+            tabLinks.forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // Show selected tab pane
+            document.getElementById(tabId).classList.add('active');
+
+            // Add active class to clicked tab link
+            event.target.classList.add('active');
+        }
 
         function toggleCreateCollectionForm() {
             const form = document.getElementById('createCollectionForm');

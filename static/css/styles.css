@@ -1,5 +1,63 @@
 /* Document RAG System Styles */
 
+/* Tab Navigation */
+.tab-container {
+    margin-bottom: 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.tab-nav {
+    display: flex;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #ddd;
+    border-radius: 5px 5px 0 0;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.tab-nav-item {
+    flex: 1;
+    text-align: center;
+}
+
+.tab-nav-link {
+    display: block;
+    padding: 15px 20px;
+    color: #495057;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-nav-link:hover {
+    background-color: #e9ecef;
+}
+
+.tab-nav-link.active {
+    color: #007bff;
+    background-color: white;
+    border-bottom: 3px solid #007bff;
+}
+
+.tab-content {
+    padding: 20px;
+    background-color: white;
+    border-radius: 0 0 5px 5px;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
 /* Utility Classes */
 .flex {
     display: flex;
