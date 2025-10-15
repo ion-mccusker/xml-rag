@@ -1,5 +1,31 @@
 /* Document RAG System Styles */
 
+/* Highlighted Text */
+.highlight-chunk {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        background-color: #ffeb3b;
+    }
+    to {
+        background-color: #fff3cd;
+    }
+}
+
+.highlight-text {
+    background-color: #ffeb3b;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-weight: 500;
+}
+
 /* Tab Navigation */
 .tab-container {
     margin-bottom: 0;

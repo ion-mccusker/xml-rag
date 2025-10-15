@@ -333,6 +333,7 @@ async def search_documents(search_request: SearchRequest):
                 "distance": result["distance"],
                 "relevance_score": round(1 - (result["distance"] / 2), 3),
                 "content": result["document"],
+                "full_content": result["document"],
                 "content_preview": result["document"][:200] + "..." if len(result["document"]) > 200 else result["document"],
                 "document_id": result["metadata"].get("document_id", ""),
                 "collection_name": result["metadata"].get("collection_name", search_request.collection_name),
@@ -344,7 +345,7 @@ async def search_documents(search_request: SearchRequest):
             # Exclude core search result fields to avoid conflicts
             core_result_fields = {
                 "filename", "document_type", "chunk_index", "distance", "relevance_score",
-                "content", "content_preview", "document_id", "collection_name", "chunk_length", "metadata"
+                "content", "full_content", "content_preview", "document_id", "collection_name", "chunk_length", "metadata"
             }
 
             for field, value in result["metadata"].items():

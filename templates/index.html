@@ -823,11 +823,12 @@
             const chunk = window.currentSearchResults[index];
             const docType = chunk.document_type || 'xml';
 
-            // Store current chunk info for full document viewing
+            // Store current chunk info for full document viewing (including chunk content for highlighting)
             currentChunkInfo = {
                 document_id: chunk.document_id,
                 filename: chunk.filename,
-                collection_name: chunk.metadata?.collection_name || null
+                collection_name: chunk.metadata?.collection_name || null,
+                chunk_content: chunk.full_content || chunk.content  // Store the full chunk content for highlighting
             };
 
             modalTitle.innerHTML = `
@@ -1201,7 +1202,7 @@
             }
         }
 
-        async function viewDocument(documentId, filename, collectionName = null) {
+        async function viewDocument(documentId, filename, collectionName = null, highlightText = null) {
             const modal = document.getElementById('documentModal');
             const modalTitle = document.getElementById('modalTitle');
             const modalContent = document.getElementById('modalContent');
@@ -1220,13 +1221,56 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    modalContent.textContent = result.full_content;
+                    const fullContent = result.full_content;
+
+                    // If highlightText is provided, find and highlight it
+                    if (highlightText && highlightText.trim()) {
+                        const cleanHighlight = highlightText.trim();
+                        const contentLower = fullContent.toLowerCase();
+                        const highlightLower = cleanHighlight.toLowerCase();
+                        let index = contentLower.indexOf(highlightLower);
+
+                        // If exact match fails, try matching first 100 characters to find approximate location
+                        if (index === -1 && cleanHighlight.length > 100) {
+                            const partialHighlight = cleanHighlight.substring(0, 100).toLowerCase();
+                            index = contentLower.indexOf(partialHighlight);
+                        }
+
+                        if (index !== -1) {
+                            // Found the text, create HTML with highlighted section
+                            const before = fullContent.substring(0, index);
+                            const highlighted = fullContent.substring(index, index + cleanHighlight.length);
+                            const after = fullContent.substring(index + cleanHighlight.length);
+
+                            modalContent.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(before)}<span class="highlight-text" id="highlightedChunk">${escapeHtml(highlighted)}</span>${escapeHtml(after)}</pre>`;
+
+                            // Scroll to the highlighted text
+                            setTimeout(() => {
+                                const highlightedElement = document.getElementById('highlightedChunk');
+                                if (highlightedElement) {
+                                    highlightedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            }, 100);
+                        } else {
+                            // Text not found, just show the document normally
+                            modalContent.textContent = fullContent;
+                        }
+                    } else {
+                        modalContent.textContent = fullContent;
+                    }
                 } else {
                     modalContent.textContent = `Error: ${result.detail}`;
                 }
             } catch (error) {
                 modalContent.textContent = `Error loading document: ${error.message}`;
             }
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function closeDocumentModal() {
@@ -1247,11 +1291,19 @@
             }
 
             try {
+                // Store the chunk info locally before closing modal (which clears currentChunkInfo)
+                const chunkInfo = { ...currentChunkInfo };
+
                 // Close the chunk modal first
                 closeChunkModal();
 
-                // Use the existing viewDocument function with collection support
-                await viewDocument(currentChunkInfo.document_id, currentChunkInfo.filename, currentChunkInfo.collection_name);
+                // Use the existing viewDocument function with collection support and chunk highlighting
+                await viewDocument(
+                    chunkInfo.document_id,
+                    chunkInfo.filename,
+                    chunkInfo.collection_name,
+                    chunkInfo.chunk_content  // Pass the chunk content for highlighting
+                );
             } catch (error) {
                 alert(`Error loading full document: ${error.message}`);
             }
