@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document RAG System</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -721,10 +723,11 @@
                 html += '<h4>Retrieved Document Chunks (used to generate answer):</h4>';
                 result.retrieved_chunks.forEach((chunk, index) => {
                     const docType = chunk.metadata.document_type || 'xml';
+                    const displayName = chunk.metadata.title || chunk.metadata.filename;
                     html += `<div class="retrieved-chunk clickable-chunk" onclick="viewChunkByIndex(${index}, 'retrieved')">
                         <div style="margin-bottom: 8px;">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                            <strong>Chunk ${index + 1}:</strong> ${chunk.metadata.filename} (chunk ${chunk.metadata.chunk_index})
+                            <strong>Chunk ${index + 1}:</strong> ${displayName} (chunk ${chunk.metadata.chunk_index})
                             <span style="float: right; color: #666;">Relevance: ${(1 - (chunk.distance / 2)).toFixed(3)}</span>
                         </div>
                         <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
@@ -750,10 +753,11 @@
                 html += '<div class="retrieval-section">';
                 result.sources.forEach((source, index) => {
                     const docType = source.document_type || 'xml';
+                    const displayName = source.title || source.metadata?.title || source.filename;
                     html += `<div class="retrieved-chunk clickable-chunk" onclick="viewChunkByIndex(${index}, 'source')">
                         <div style="margin-bottom: 8px;">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                            <strong>Source ${index + 1}:</strong> ${source.filename} (chunk ${source.chunk_index})
+                            <strong>Source ${index + 1}:</strong> ${displayName} (chunk ${source.chunk_index})
                             <span style="float: right; color: #666;">Relevance: ${source.relevance_score}</span>
                         </div>
                         <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
@@ -789,10 +793,11 @@
                 html += '<div class="retrieval-section">';
                 result.results.forEach((chunk, index) => {
                     const docType = chunk.document_type || 'xml';
+                    const displayName = chunk.title || chunk.metadata?.title || chunk.filename;
                     html += `<div class="retrieved-chunk clickable-chunk" onclick="viewSearchChunk(${index})">
                         <div style="margin-bottom: 8px;">
                             <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                            <strong>Result ${index + 1}:</strong> ${chunk.filename} (chunk ${chunk.chunk_index})
+                            <strong>Result ${index + 1}:</strong> ${displayName} (chunk ${chunk.chunk_index})
                             <span style="float: right; color: #666;">Relevance: ${chunk.relevance_score}</span>
                         </div>
                         <div style="background-color: #f8f9fa; padding: 8px; border-radius: 3px; font-family: monospace; font-size: 11px;">
@@ -825,6 +830,7 @@
 
             const chunk = window.currentSearchResults[index];
             const docType = chunk.document_type || 'xml';
+            const displayName = chunk.title || chunk.metadata?.title || chunk.filename;
 
             // Store current chunk info for full document viewing (including chunk content for highlighting)
             currentChunkInfo = {
@@ -836,7 +842,7 @@
 
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                Chunk ${chunk.chunk_index} from ${chunk.filename}
+                Chunk ${chunk.chunk_index} from ${displayName}
             `;
 
             // For search results, metadata is mixed with chunk data, so we need to extract it
@@ -1225,6 +1231,7 @@
 
                 if (response.ok) {
                     const fullContent = result.full_content;
+                    const isMarkdown = filename.toLowerCase().endsWith('.md');
 
                     // If highlightText is provided, find and highlight it
                     if (highlightText && highlightText.trim()) {
@@ -1245,7 +1252,15 @@
                             const highlighted = fullContent.substring(index, index + cleanHighlight.length);
                             const after = fullContent.substring(index + cleanHighlight.length);
 
-                            modalContent.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(before)}<span class="highlight-text" id="highlightedChunk">${escapeHtml(highlighted)}</span>${escapeHtml(after)}</pre>`;
+                            if (isMarkdown) {
+                                // For markdown with highlighting, we need to be careful
+                                // Render the whole thing first, then highlight
+                                const renderedHtml = marked.parse(fullContent);
+                                modalContent.innerHTML = `<div class="markdown-content">${renderedHtml}</div>`;
+                                // TODO: Could add text highlighting in rendered markdown in the future
+                            } else {
+                                modalContent.innerHTML = `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(before)}<span class="highlight-text" id="highlightedChunk">${escapeHtml(highlighted)}</span>${escapeHtml(after)}</pre>`;
+                            }
 
                             // Scroll to the highlighted text
                             setTimeout(() => {
@@ -1256,10 +1271,21 @@
                             }, 100);
                         } else {
                             // Text not found, just show the document normally
-                            modalContent.textContent = fullContent;
+                            if (isMarkdown) {
+                                const renderedHtml = marked.parse(fullContent);
+                                modalContent.innerHTML = `<div class="markdown-content">${renderedHtml}</div>`;
+                            } else {
+                                modalContent.textContent = fullContent;
+                            }
                         }
                     } else {
-                        modalContent.textContent = fullContent;
+                        // No highlight text - render based on file type
+                        if (isMarkdown) {
+                            const renderedHtml = marked.parse(fullContent);
+                            modalContent.innerHTML = `<div class="markdown-content">${renderedHtml}</div>`;
+                        } else {
+                            modalContent.textContent = fullContent;
+                        }
                     }
                 } else {
                     modalContent.textContent = `Error: ${result.detail}`;
@@ -1318,7 +1344,7 @@
             const modalContent = document.getElementById('chunkModalContent');
             const modalMetadata = document.getElementById('chunkModalMetadata');
 
-            let chunk, content, filename, chunkIndex, docType, metadata;
+            let chunk, content, filename, chunkIndex, docType, metadata, displayName;
 
             if (type === 'retrieved') {
                 chunk = currentChunks[index];
@@ -1327,6 +1353,7 @@
                 chunkIndex = chunk.metadata.chunk_index;
                 docType = chunk.metadata.document_type || 'xml';
                 metadata = chunk.metadata;
+                displayName = chunk.metadata.title || chunk.metadata.filename;
 
                 // Store current chunk info for full document viewing
                 currentChunkInfo = {
@@ -1341,6 +1368,7 @@
                 chunkIndex = chunk.chunk_index;
                 docType = chunk.document_type || 'xml';
                 metadata = chunk.metadata || {};
+                displayName = chunk.title || chunk.metadata?.title || chunk.filename;
 
                 // Store current chunk info for full document viewing
                 currentChunkInfo = {
@@ -1352,7 +1380,7 @@
 
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                Chunk ${chunkIndex} from ${filename}
+                Chunk ${chunkIndex} from ${displayName}
             `;
 
             // Format metadata for display with chunk data
@@ -1362,7 +1390,17 @@
             const summary = document.getElementById('chunkMetadataSummary');
             summary.textContent = generateMetadataSummary(metadata, docType);
 
-            modalContent.textContent = content;
+            // Check if it's a markdown file and render accordingly
+            const isMarkdown = filename && filename.toLowerCase().endsWith('.md');
+            if (isMarkdown) {
+                const renderedHtml = marked.parse(content);
+                modalContent.innerHTML = `<div class="markdown-content">${renderedHtml}</div>`;
+                modalContent.style.whiteSpace = 'normal';
+            } else {
+                modalContent.textContent = content;
+                modalContent.style.whiteSpace = 'pre-wrap';
+            }
+
             modal.style.display = 'block';
         }
 
@@ -1372,9 +1410,11 @@
             const modalContent = document.getElementById('chunkModalContent');
             const modalMetadata = document.getElementById('chunkModalMetadata');
 
+            const displayName = metadata.title || filename;
+
             modalTitle.innerHTML = `
                 <span class="doc-type-badge doc-type-${docType}">${docType.toUpperCase()}</span>
-                Chunk ${chunkIndex} from ${filename}
+                Chunk ${chunkIndex} from ${displayName}
             `;
 
             // Format metadata for display (minimal info if no metadata provided)
@@ -1397,7 +1437,17 @@
                 summary.textContent = generateMetadataSummary(metadata, docType);
             }
 
-            modalContent.textContent = chunkContent;
+            // Check if it's a markdown file and render accordingly
+            const isMarkdown = filename && filename.toLowerCase().endsWith('.md');
+            if (isMarkdown) {
+                const renderedHtml = marked.parse(chunkContent);
+                modalContent.innerHTML = `<div class="markdown-content">${renderedHtml}</div>`;
+                modalContent.style.whiteSpace = 'normal';
+            } else {
+                modalContent.textContent = chunkContent;
+                modalContent.style.whiteSpace = 'pre-wrap';
+            }
+
             modal.style.display = 'block';
         }
 
@@ -1419,7 +1469,7 @@
         }
 
         // Track last action for Enter key behavior
-        let lastAction = 'query'; // default to query
+        let lastAction = 'search'; // default to search
 
         // Update button click handlers to track last action
         const searchButton = document.querySelector('button[onclick="searchDocuments()"]');
